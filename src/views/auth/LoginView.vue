@@ -45,7 +45,7 @@ function onClick() {
                   </v-form>
 
                   <v-divider class="my-5"> </v-divider>
-                  <h5>
+                  <h5 class="text-center">
                     Don't have an account?
                     <RouterLink to="/register">Click here to Register</RouterLink>
                   </h5>
