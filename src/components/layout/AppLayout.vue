@@ -9,7 +9,7 @@ function onClick() {
 </script>
 
 <template>
-  <v-responsive class="border rounded">
+  <v-responsive>
     <v-app :theme="theme">
       <v-app-bar class="px-3">
         <v-spacer></v-spacer>
@@ -28,7 +28,7 @@ function onClick() {
         </v-container>
       </v-main>
 
-      <v-footer border app>2025 BCWD Complaint System</v-footer>
+      <v-footer class="font-wight-bold" border app>2025 BCWD Complaint System</v-footer>
     </v-app>
   </v-responsive>
 </template>
