@@ -26,7 +26,7 @@ function onClick() {
         <v-container>
           <v-row>
             <v-col cols="12" md="6" class="mx-auto">
-              <v-card class="mx-auto" subtitle="Login">
+              <v-card class="mx-auto" prepend-icon="$vuetify" subtitle="Login">
                 <template v-slot:title>
                   <span class="font-weight-black">Welcome to BCWD Complaint System</span>
                 </template>
@@ -43,12 +43,6 @@ function onClick() {
 
                     <v-btn class="mt-2" type="submit" block>Submit</v-btn>
                   </v-form>
-
-                  <v-divider class="my-5"> </v-divider>
-                  <h5>
-                    Don't have an account?
-                    <RouterLink to="/register">Click here to Register</RouterLink>
-                  </h5>
                 </v-card-text>
               </v-card>
             </v-col>
