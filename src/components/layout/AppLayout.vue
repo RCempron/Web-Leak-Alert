@@ -24,9 +24,7 @@ function onClick() {
       </v-app-bar>
 
       <v-main>
-        <v-container>
-          <slot name="content"></slot>
-        </v-container>
+        <slot name="content"></slot>
       </v-main>
 
       <v-footer class="font-wight-bold" border app>2025 BCWD Complaint System</v-footer>
