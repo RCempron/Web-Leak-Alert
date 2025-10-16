@@ -1,50 +1,66 @@
 <script setup>
 import { ref } from 'vue'
+import { supabase, formActionDefault } from '@/utils/supabase'
+import AlertNotification from '../common/AlertNotification.vue'
 
-// ✅ form reference
 const refVForm = ref()
+const formAction = ref({ ...formActionDefault })
 
-// ✅ form data for Supabase integration
-const formDataDefault = {
+const formData = ref({
   firstname: '',
   lastname: '',
   email: '',
   password: '',
   password_confirmation: '',
-}
+})
 
-const formData = ref({ ...formDataDefault })
-
-// ✅ password visibility toggles
 const isPasswordVisible = ref(false)
 const isConfirmPasswordVisible = ref(false)
 
-// ✅ validators
 const requiredValidator = (value) => !!value || 'This field is required'
-
-const emailValidator = (value) => {
-  const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return pattern.test(value) || 'Enter a valid email address'
-}
-
+const emailValidator = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || 'Enter a valid email'
 const passwordValidator = (value) => value.length >= 8 || 'Password must be at least 8 characters'
-
 const confirmPasswordValidator = (value) =>
   value === formData.value.password || 'Passwords do not match'
 
-// ✅ submit handler (will later handle Supabase signup)
-const onFormSubmit = () => {
-  refVForm.value?.validate().then(({ valid }) => {
-    if (valid) {
-      alert(`✅ Registering user: ${formData.value.email}`)
-      // 👉 Replace this later with Supabase auth call
-      // e.g., await supabase.auth.signUp({...})
-    }
+const onFormSubmit = async () => {
+  const { valid } = await refVForm.value.validate()
+  if (!valid) return
+
+  formAction.value = { ...formActionDefault, formProcess: true }
+
+  const { data, error } = await supabase.auth.signUp({
+    email: formData.value.email,
+    password: formData.value.password,
+    options: {
+      data: {
+        firstname: formData.value.firstname,
+        lastname: formData.value.lastname,
+      },
+    },
   })
+
+  if (error) {
+    console.error('Supabase Error:', error)
+    formAction.value.formErrorMessage = error.message
+    formAction.value.formStatus = error.status
+  } else {
+    console.log('Supabase Response:', data)
+    formAction.value.formSuccessMessage = 'Successfully Registered Account.'
+
+    refVForm.value?.reset()
+  }
+
+  formAction.value.formProcess = false
 }
 </script>
 
 <template>
+  <AlertNotification
+    :form-success-message="formAction.formSuccessMessage"
+    :form-error-message="formAction.formErrorMessage"
+  ></AlertNotification>
+
   <v-form ref="refVForm" @submit.prevent="onFormSubmit">
     <!-- Firstname -->
     <v-text-field
@@ -110,6 +126,8 @@ const onFormSubmit = () => {
       color="primary"
       size="large"
       prepend-icon="mdi-account-plus"
+      :disabled="formAction.formProcess"
+      :loading="formAction.formProcess"
     >
       Register
     </v-btn>
