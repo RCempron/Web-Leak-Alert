@@ -70,11 +70,11 @@ function toggleTheme() {
                 <v-divider class="flex-grow-1"></v-divider>
               </div>
 
-              <!-- Social Login -->
+              <!-- Social Login
               <div class="d-flex justify-center ga-2 mb-4">
                 <v-btn icon="mdi-facebook" color="blue" variant="flat"></v-btn>
                 <v-btn icon="mdi-google" color="red" variant="flat"></v-btn>
-              </div>
+              </div> -->
 
               <!-- Register Link -->
               <div class="text-center">
