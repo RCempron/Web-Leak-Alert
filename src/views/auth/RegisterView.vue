@@ -69,9 +69,9 @@ watch(theme, (val) => (vuetifyTheme.global.name.value = val))
               </div>
 
               <div class="text-center">
-                <span>Already have an account?</span>
-                <RouterLink to="/login" class="font-weight-bold text-blue text-decoration-none"
-                  >Login</RouterLink
+                <span>Already have an account? </span>
+                <RouterLink to="/login" class="font-weight-bold text-blue text-decoration-none">
+                  Login here</RouterLink
                 >
               </div>
             </v-card>

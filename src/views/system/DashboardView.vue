@@ -18,7 +18,6 @@ function toggleTheme() {
   vuetifyTheme.global.name.value = theme.value
 }
 
-// Watch theme (keep synced if needed)
 watch(theme, (val) => (vuetifyTheme.global.name.value = val))
 
 // Logout
@@ -27,6 +26,7 @@ async function logout() {
   router.push('/login')
 }
 
+// Dashboard cards
 const cards = [
   { title: 'Report a Leak', icon: 'mdi-water-alert', color: 'blue', route: '/report' },
   { title: 'My Reports', icon: 'mdi-format-list-bulleted', color: 'green', route: '/my-reports' },
@@ -36,6 +36,7 @@ const cards = [
 
 <template>
   <v-app>
+    <!-- App Bar -->
     <v-app-bar
       flat
       density="comfortable"
@@ -50,15 +51,18 @@ const cards = [
       <v-btn icon variant="text" @click="toggleTheme">
         <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
       </v-btn>
-      <v-btn icon variant="text" color="error" @click="logout"><v-icon>mdi-logout</v-icon></v-btn>
+      <v-btn icon variant="text" color="error" @click="logout">
+        <v-icon>mdi-logout</v-icon>
+      </v-btn>
     </v-app-bar>
 
+    <!-- Main Dashboard -->
     <v-main
       class="d-flex align-center justify-center pa-6"
       :class="theme === 'light' ? 'bg-grey-lighten-5' : 'bg-grey-darken-4'"
     >
-      <v-container class="text-center">
-        <v-row justify="center" class="mb-8">
+      <v-container>
+        <v-row justify="center" class="text-center mb-8">
           <v-col cols="12">
             <h2 class="font-weight-bold text-h5 text-md-h4 mb-2">Welcome to LeakAlert Dashboard</h2>
             <p class="text-medium-emphasis">
@@ -66,19 +70,23 @@ const cards = [
             </p>
           </v-col>
         </v-row>
-        <v-row justify="center" align="stretch" class="ga-4">
+
+        <!-- Responsive Cards -->
+        <v-row
+          class="d-flex justify-center align-center text-center"
+          align="stretch"
+          justify="center"
+        >
           <v-col
-            v-for="(card, i) in cards"
-            :key="i"
+            v-for="(card, index) in cards"
+            :key="index"
             cols="12"
             sm="6"
             md="4"
             class="d-flex justify-center"
           >
             <v-card
-              class="pa-6 hover-scale text-center"
-              max-width="300"
-              min-height="220"
+              class="pa-6 hover-scale text-center dashboard-card"
               :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
               elevation="8"
               rounded="xl"
@@ -93,6 +101,7 @@ const cards = [
       </v-container>
     </v-main>
 
+    <!-- Footer -->
     <v-footer
       app
       class="text-center py-2"
@@ -120,5 +129,15 @@ const cards = [
 }
 .hover-scale:hover {
   transform: scale(1.05);
+}
+
+/* ✅ Consistent card sizes */
+.dashboard-card {
+  width: 280px;
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 </style>

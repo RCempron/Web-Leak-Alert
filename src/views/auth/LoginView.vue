@@ -69,9 +69,9 @@ watch(theme, (val) => (vuetifyTheme.global.name.value = val))
               </div>
 
               <div class="text-center">
-                <span>Don’t have an account?</span>
-                <RouterLink to="/register" class="font-weight-bold text-blue text-decoration-none"
-                  >Register</RouterLink
+                <span>Don’t have an account? </span>
+                <RouterLink to="/register" class="font-weight-bold text-blue text-decoration-none">
+                  Register here</RouterLink
                 >
               </div>
             </v-card>
