@@ -1,18 +1,25 @@
 <script setup>
-import { ref } from 'vue'
-import { useDisplay } from 'vuetify'
+import { ref, watch } from 'vue'
+import { useDisplay, useTheme } from 'vuetify'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/utils/supabase.js'
 
 const { mobile } = useDisplay()
 const router = useRouter()
+const vuetifyTheme = useTheme()
 
-// Theme switch
+// Persistent theme
 const theme = ref(localStorage.getItem('theme') ?? 'light')
+vuetifyTheme.global.name.value = theme.value
+
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', theme.value)
+  vuetifyTheme.global.name.value = theme.value
 }
+
+// Watch theme (keep synced if needed)
+watch(theme, (val) => (vuetifyTheme.global.name.value = val))
 
 // Logout
 async function logout() {
@@ -20,7 +27,6 @@ async function logout() {
   router.push('/login')
 }
 
-// Sample dashboard cards
 const cards = [
   { title: 'Report a Leak', icon: 'mdi-water-alert', color: 'blue', route: '/report' },
   { title: 'My Reports', icon: 'mdi-format-list-bulleted', color: 'green', route: '/my-reports' },
@@ -29,49 +35,41 @@ const cards = [
 </script>
 
 <template>
-  <v-app :theme="theme">
-    <!-- App Bar -->
+  <v-app>
     <v-app-bar
       flat
+      density="comfortable"
       :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-4'"
-      class="px-6"
+      class="px-4"
     >
-      <v-toolbar-title class="font-weight-bold text-h5">
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">Leak</span
-        ><span class="text-black">Alert</span>
+      <v-toolbar-title class="font-weight-bold" :class="mobile ? 'text-h6' : 'text-h5'">
+        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">Leak</span>
+        <span :style="{ color: theme === 'light' ? '#000' : '#fff' }">Alert</span>
       </v-toolbar-title>
-
-      <v-spacer></v-spacer>
-
-      <!-- Theme Toggle -->
-      <v-btn
-        :prepend-icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-        @click="toggleTheme"
-        variant="text"
-      ></v-btn>
-
-      <!-- Logout -->
-      <v-btn prepend-icon="mdi-logout" color="error" variant="text" @click="logout"> Logout </v-btn>
+      <v-spacer />
+      <v-btn icon variant="text" @click="toggleTheme">
+        <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
+      </v-btn>
+      <v-btn icon variant="text" color="error" @click="logout"><v-icon>mdi-logout</v-icon></v-btn>
     </v-app-bar>
 
-    <!-- Main Dashboard -->
     <v-main
-      :class="theme === 'light' ? 'bg-grey-lighten-5' : 'bg-grey-darken-4'"
       class="d-flex align-center justify-center pa-6"
+      :class="theme === 'light' ? 'bg-grey-lighten-5' : 'bg-grey-darken-4'"
     >
-      <v-container>
-        <v-row justify="center" align="center" class="text-center">
+      <v-container class="text-center">
+        <v-row justify="center" class="mb-8">
           <v-col cols="12">
-            <h2 class="font-weight-bold mb-6">Welcome to LeakAlert Dashboard</h2>
-            <p class="text-medium-emphasis mb-10">
+            <h2 class="font-weight-bold text-h5 text-md-h4 mb-2">Welcome to LeakAlert Dashboard</h2>
+            <p class="text-medium-emphasis">
               Manage your leak reports and account using the shortcuts below.
             </p>
           </v-col>
-
-          <!-- Dashboard Cards -->
+        </v-row>
+        <v-row justify="center" align="stretch" class="ga-4">
           <v-col
-            v-for="(card, index) in cards"
-            :key="index"
+            v-for="(card, i) in cards"
+            :key="i"
             cols="12"
             sm="6"
             md="4"
@@ -79,11 +77,11 @@ const cards = [
           >
             <v-card
               class="pa-6 hover-scale text-center"
+              max-width="300"
+              min-height="220"
               :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
               elevation="8"
               rounded="xl"
-              width="250"
-              height="220"
               @click="router.push(card.route)"
             >
               <v-icon :color="card.color" size="64" class="mb-4">{{ card.icon }}</v-icon>
@@ -95,9 +93,10 @@ const cards = [
       </v-container>
     </v-main>
 
-    <!-- Footer -->
     <v-footer
+      app
       class="text-center py-2"
+      height="48"
       :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-3'"
     >
       <small>&copy; 2025 LeakAlert | All Rights Reserved</small>
@@ -115,11 +114,8 @@ const cards = [
 .bg-grey-darken-4 {
   background-color: #121212;
 }
-.text-black {
-  color: #000000;
-}
 .hover-scale {
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
   cursor: pointer;
 }
 .hover-scale:hover {
