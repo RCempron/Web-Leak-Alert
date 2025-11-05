@@ -3,6 +3,7 @@ import LoginView from '@/views/auth/LoginView.vue'
 import RegisterView from '@/views/auth/RegisterView.vue'
 import DashboardView from '@/views/system/DashboardView.vue'
 import ProfileView from '@/views/system/ProfileView.vue'
+import ReportPage from '@/views/system/ReportPage.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -31,6 +32,12 @@ const router = createRouter({
       name: 'profile',
       component: ProfileView,
       meta: { requiresAuth: true },
+    },
+    {
+      path: '/report',
+      name: 'report',
+      component: ReportPage,
+      meta: { requiresAuth: true }, // optional
     },
   ],
 })
