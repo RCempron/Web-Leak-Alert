@@ -8,7 +8,7 @@ const router = useRouter()
 
 const loading = ref(false)
 const saving = ref(false)
-const editing = ref(false) // ✨ Controls edit mode
+const editing = ref(false)
 const user = ref(null)
 
 const email = ref('')
@@ -70,7 +70,7 @@ async function saveProfile() {
 
     user.value = data?.user ?? user.value
     formSuccessMessage.value = 'Profile updated successfully.'
-    editing.value = false // disable edit mode
+    editing.value = false
   } catch (err) {
     console.error('Update failed', err)
     formErrorMessage.value = err?.message || String(err)
@@ -93,7 +93,7 @@ onMounted(loadCurrentUser)
 
 <template>
   <v-app :theme="theme">
-    <!-- App Bar -->
+    <!-- Header -->
     <v-app-bar
       flat
       :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-4'"
@@ -116,17 +116,19 @@ onMounted(loadCurrentUser)
     <!-- Main -->
     <v-main
       :class="theme === 'light' ? 'bg-grey-lighten-5' : 'bg-grey-darken-4'"
-      class="d-flex align-center justify-center pa-6"
+      class="d-flex align-center justify-center"
+      style="min-height: calc(100vh - 64px - 48px)"
     >
-      <v-container>
-        <v-row justify="center">
-          <v-col cols="12" sm="8" md="6" lg="5">
+      <v-container class="fill-height d-flex align-center justify-center">
+        <v-row justify="center" class="w-100">
+          <v-col cols="12" sm="10" md="8" lg="7" xl="6">
             <v-card
-              class="pa-8 text-center modern-card"
+              class="pa-8 text-center modern-card mx-auto"
               :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
               elevation="10"
               rounded="xl"
             >
+              <!-- Avatar -->
               <v-avatar size="90" class="mb-4">
                 <v-icon size="90" color="primary">mdi-account-circle</v-icon>
               </v-avatar>
@@ -139,10 +141,11 @@ onMounted(loadCurrentUser)
                 :form-error-message="formErrorMessage"
               />
 
+              <!-- Loader -->
               <v-skeleton-loader v-if="loading" type="heading, paragraph, paragraph" class="mb-4" />
 
+              <!-- Profile Fields -->
               <div v-else>
-                <!-- Fields -->
                 <v-text-field
                   v-model="email"
                   label="Email"
@@ -151,7 +154,6 @@ onMounted(loadCurrentUser)
                   class="mb-3"
                   readonly
                 />
-
                 <v-text-field
                   v-model="firstname"
                   label="First Name"
@@ -160,7 +162,6 @@ onMounted(loadCurrentUser)
                   class="mb-3"
                   :readonly="!editing"
                 />
-
                 <v-text-field
                   v-model="lastname"
                   label="Last Name"
@@ -169,7 +170,6 @@ onMounted(loadCurrentUser)
                   class="mb-3"
                   :readonly="!editing"
                 />
-
                 <v-text-field
                   v-model="age"
                   label="Age"
@@ -179,7 +179,6 @@ onMounted(loadCurrentUser)
                   type="number"
                   :readonly="!editing"
                 />
-
                 <v-text-field
                   v-model="residency"
                   label="Residency"
@@ -189,24 +188,53 @@ onMounted(loadCurrentUser)
                   :readonly="!editing"
                 />
 
-                <!-- Buttons -->
-                <div class="d-flex justify-center flex-wrap gap-3 mt-6">
-                  <v-btn v-if="!editing" color="primary" size="large" @click="editing = true">
+                <!-- ✅ Fixed Responsive Buttons -->
+                <div class="button-group d-flex flex-wrap justify-center align-center mt-6">
+                  <v-btn
+                    v-if="!editing"
+                    color="primary"
+                    size="large"
+                    class="flex-btn"
+                    @click="editing = true"
+                  >
                     <v-icon start>mdi-account-edit</v-icon>
                     Edit Profile
                   </v-btn>
 
-                  <v-btn v-else color="success" size="large" :loading="saving" @click="saveProfile">
+                  <v-btn
+                    v-else
+                    color="success"
+                    size="large"
+                    class="flex-btn"
+                    :loading="saving"
+                    @click="saveProfile"
+                  >
                     <v-icon start>mdi-content-save</v-icon>
                     Save Changes
                   </v-btn>
 
-                  <v-btn color="secondary" variant="outlined" size="large" @click="goBack">
+                  <!-- <v-btn
+                    color="secondary"
+                    variant="outlined"
+                    size="large"
+                    class="flex-btn"
+                    @click="goBack"
+                  >
                     <v-icon start>mdi-arrow-left</v-icon>
                     Back to Dashboard
+                  </v-btn> -->
+
+                  <v-btn variant="outlined" size="large" @click="$router.replace('/dashboard')">
+                    <v-icon start>mdi-arrow-left</v-icon> Back
                   </v-btn>
 
-                  <v-btn color="error" variant="outlined" size="large" @click="logout">
+                  <v-btn
+                    color="error"
+                    variant="outlined"
+                    size="large"
+                    class="flex-btn"
+                    @click="logout"
+                  >
                     <v-icon start>mdi-logout</v-icon>
                     Logout
                   </v-btn>
@@ -232,25 +260,39 @@ onMounted(loadCurrentUser)
 .text-blue {
   color: #1976d2;
 }
+.text-black {
+  color: #000000;
+}
 .bg-grey-lighten-5 {
   background-color: #f5f5f5;
 }
 .bg-grey-darken-4 {
   background-color: #121212;
 }
-.text-black {
-  color: #000000;
-}
-.gap-3 {
-  gap: 12px;
-}
 .modern-card {
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
+  transition: all 0.3s ease;
+  width: 100%;
+  max-width: 850px; /* wider for desktop */
 }
 .modern-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* ✅ Fix buttons to be fluid and wrap nicely */
+.button-group {
+  gap: 12px;
+  width: 100%;
+}
+.flex-btn {
+  flex: 1 1 200px; /* grows, shrinks, min width 200px */
+  max-width: 240px;
+  justify-content: center;
+}
+@media (max-width: 600px) {
+  .flex-btn {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
 }
 </style>
