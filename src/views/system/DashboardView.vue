@@ -64,7 +64,9 @@ const cards = [
       <v-container>
         <v-row justify="center" class="text-center mb-8">
           <v-col cols="12">
-            <h2 class="font-weight-bold text-h5 text-md-h4 mb-2">Welcome to LeakAlert Dashboard</h2>
+            <h2 class="font-weight-bold text-h5 text-md-h4 mb-2">
+              <br />Welcome to LeakAlert Dashboard
+            </h2>
             <p class="text-medium-emphasis">
               Manage your leak reports and account using the shortcuts below.
             </p>

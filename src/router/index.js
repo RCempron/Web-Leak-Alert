@@ -2,6 +2,9 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import LoginView from '@/views/auth/LoginView.vue'
 import RegisterView from '@/views/auth/RegisterView.vue'
 import DashboardView from '@/views/system/DashboardView.vue'
+import ProfileView from '@/views/system/ProfileView.vue'
+import ReportPage from '@/views/system/ReportPage.vue'
+import ReportHistory from '@/views/system/ReportHistory.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -24,6 +27,23 @@ const router = createRouter({
       path: '/dashboard',
       name: 'dashboard',
       component: DashboardView,
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: ProfileView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/report',
+      name: 'report',
+      component: ReportPage,
+      meta: { requiresAuth: true }, // optional
+    },
+    {
+      path: '/my-reports',
+      name: 'ReportHistory',
+      component: ReportHistory,
     },
   ],
 })
