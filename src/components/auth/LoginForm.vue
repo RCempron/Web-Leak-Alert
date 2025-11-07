@@ -1,3 +1,4 @@
+<!-- src/components/auth/LoginForm.vue -->
 <script setup>
 import { ref } from 'vue'
 import { requiredValidator, emailValidator } from '@/utils/validators.js'
@@ -8,41 +9,41 @@ import AlertNotification from '../common/AlertNotification.vue'
 const router = useRouter()
 const isPasswordVisible = ref(false)
 const refVForm = ref()
-
-const formDataDefault = {
-  email: '',
-  password: '',
-}
-
-const formData = ref({ ...formDataDefault })
+const formData = ref({ email: '', password: '' })
 const formAction = ref({ ...formActionDefault })
 
-// ✅ Main form submission handler
 const onFormSubmit = async () => {
   const { valid } = await refVForm.value.validate()
   if (!valid) return
 
-  // Reset form action to default
-  formAction.value = { ...formActionDefault }
-  formAction.value.formProcess = true
+  formAction.value = { ...formActionDefault, formProcess: true }
 
-  // 👉 Attempt login via Supabase
   const { data, error } = await supabase.auth.signInWithPassword({
     email: formData.value.email,
     password: formData.value.password,
   })
 
   if (error) {
-    console.error('Supabase Error:', error)
     formAction.value.formErrorMessage = error.message
-    formAction.value.formStatus = error.status
-  } else {
-    console.log('Supabase Response:', data)
-    formAction.value.formSuccessMessage = 'Successfully Logged In.'
-
-    // Redirect to dashboard after login
-    router.replace('/dashboard')
+    formAction.value.formProcess = false
+    return
   }
+
+  const user = data?.user
+  if (!user) {
+    formAction.value.formErrorMessage = 'Login failed — no user data.'
+    formAction.value.formProcess = false
+    return
+  }
+
+  // ✅ Identify user role
+  const role = user.user_metadata?.role || 'user'
+  formAction.value.formSuccessMessage = 'Successfully Logged In.'
+
+  setTimeout(() => {
+    if (role === 'admin') router.replace('/admin')
+    else router.replace('/dashboard')
+  }, 300)
 
   refVForm.value?.reset()
   formAction.value.formProcess = false
@@ -83,8 +84,8 @@ const onFormSubmit = async () => {
       size="large"
       type="submit"
       prepend-icon="mdi-login"
-      :disabled="formAction.formProcess"
       :loading="formAction.formProcess"
+      :disabled="formAction.formProcess"
     >
       Login
     </v-btn>

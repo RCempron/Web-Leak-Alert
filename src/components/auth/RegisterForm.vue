@@ -1,3 +1,4 @@
+<!-- src/components/auth/RegisterForm.vue -->
 <script setup>
 import { ref } from 'vue'
 import { supabase, formActionDefault } from '@/utils/supabase'
@@ -5,7 +6,6 @@ import AlertNotification from '../common/AlertNotification.vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-
 const refVForm = ref()
 const formAction = ref({ ...formActionDefault })
 
@@ -15,6 +15,7 @@ const formData = ref({
   email: '',
   password: '',
   password_confirmation: '',
+  // admin_code: '', // optional: uncomment if you want to show an admin_code input in the form (dev only)
 })
 
 const isPasswordVisible = ref(false)
@@ -32,6 +33,23 @@ const onFormSubmit = async () => {
 
   formAction.value = { ...formActionDefault, formProcess: true }
 
+  // default role
+  let roleToSet = 'user'
+
+  // Optional dev-only admin-code support:
+  // If you want to create an admin via the registration form for testing only:
+  //  - add VITE_ADMIN_CODE=some-secret in your local .env
+  //  - uncomment the "admin_code" field in formData above and add an input in the template
+  //  - This is INSECURE in production — use manual metadata changes in Supabase for real admins.
+  try {
+    const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE
+    if (ADMIN_CODE && formData.value.admin_code && formData.value.admin_code === ADMIN_CODE) {
+      roleToSet = 'admin'
+    }
+  } catch (e) {
+    // ignore if env not present
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email: formData.value.email,
     password: formData.value.password,
@@ -39,6 +57,7 @@ const onFormSubmit = async () => {
       data: {
         firstname: formData.value.firstname,
         lastname: formData.value.lastname,
+        role: roleToSet, // safe default
       },
     },
   })
@@ -51,11 +70,12 @@ const onFormSubmit = async () => {
     console.log('Supabase Response:', data)
     formAction.value.formSuccessMessage = 'Successfully Registered Account.'
 
+    // After registering, you can either send them to dashboard or show message.
+    // If email confirm is enabled, the user must confirm before signing in.
     router.replace('/dashboard')
   }
 
   refVForm.value?.reset()
-
   formAction.value.formProcess = false
 }
 </script>
@@ -122,6 +142,17 @@ const onFormSubmit = async () => {
       @click:append-inner="isConfirmPasswordVisible = !isConfirmPasswordVisible"
       :rules="[requiredValidator, confirmPasswordValidator]"
     ></v-text-field>
+
+    <!-- Optional: dev admin code input (uncomment in both template and formData if you use it) -->
+    <!--
+    <v-text-field
+      v-model="formData.admin_code"
+      label="Admin Code (dev only)"
+      prepend-inner-icon="mdi-key"
+      variant="outlined"
+      class="mb-4"
+    />
+    -->
 
     <!-- Submit Button -->
     <v-btn
