@@ -44,8 +44,8 @@ const cards = [
       class="px-4"
     >
       <v-toolbar-title class="font-weight-bold" :class="mobile ? 'text-h6' : 'text-h5'">
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">Leak</span>
-        <span :style="{ color: theme === 'light' ? '#000' : '#fff' }">Alert</span>
+        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">BCWD </span>
+        <span :style="{ color: theme === 'light' ? '#000' : '#fff' }">Complaint System</span>
       </v-toolbar-title>
       <v-spacer />
       <v-btn icon variant="text" @click="toggleTheme">
@@ -65,10 +65,10 @@ const cards = [
         <v-row justify="center" class="text-center mb-8">
           <v-col cols="12">
             <h2 class="font-weight-bold text-h5 text-md-h4 mb-2">
-              <br />Welcome to LeakAlert Dashboard
+              <br />Welcome to BCWD Complaint System
             </h2>
             <p class="text-medium-emphasis">
-              Manage your leak reports and account using the shortcuts below.
+              Manage your reports and account using the shortcuts below.
             </p>
           </v-col>
         </v-row>

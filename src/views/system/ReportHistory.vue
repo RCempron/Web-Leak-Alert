@@ -55,9 +55,9 @@ onMounted(async () => {
       :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-4'"
       class="px-6"
     >
-      <v-toolbar-title class="font-weight-bold text-h5">
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">Leak</span>
-        <span class="text-black">Alert</span>
+      <v-toolbar-title class="font-weight-bold" :class="mobile ? 'text-h6' : 'text-h5'">
+        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">BCWD </span>
+        <span :style="{ color: theme === 'light' ? '#000' : '#fff' }">Complaint System</span>
       </v-toolbar-title>
 
       <v-spacer></v-spacer>

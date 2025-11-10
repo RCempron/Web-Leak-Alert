@@ -6,16 +6,9 @@
       :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-4'"
       class="px-6"
     >
-      <v-toolbar-title class="font-weight-bold text-h5 d-flex align-center">
-        <v-img
-          src="/images/LeakAlertLogo.png"
-          alt="LeakAlert Logo"
-          width="36"
-          height="36"
-          class="mr-2"
-        />
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">Leak</span>
-        <span class="text-black">Alert</span>
+      <v-toolbar-title class="font-weight-bold" :class="mobile ? 'text-h6' : 'text-h5'">
+        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">BCWD </span>
+        <span :style="{ color: theme === 'light' ? '#000' : '#fff' }">Complaint System</span>
       </v-toolbar-title>
 
       <v-spacer></v-spacer>
@@ -42,7 +35,7 @@
               max-width="900"
               :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
             >
-              <h3 class="font-weight-bold mb-2 text-center">Report a Leak</h3>
+              <h3 class="font-weight-bold mb-2 text-center">File a complaint</h3>
               <p class="text-medium-emphasis mb-4 text-center">
                 Provide details and optional photos. Capture your location for faster response.
               </p>
@@ -98,7 +91,7 @@
                     <span v-if="latitude && longitude" class="text-caption">
                       Lat: {{ latitude.toFixed(6) }}, Lng: {{ longitude.toFixed(6) }}
                     </span>
-                    <span v-else class="text-caption">No location captured</span>
+                    <span v-else class="text-caption"> No location captured</span>
                   </div>
                   <small class="text-caption">
                     If geolocation fails, write the place in Landmark.

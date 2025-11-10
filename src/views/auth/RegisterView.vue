@@ -27,8 +27,8 @@ watch(theme, (val) => (vuetifyTheme.global.name.value = val))
       class="px-4"
     >
       <v-toolbar-title class="font-weight-bold" :class="mobile ? 'text-h6' : 'text-h5'">
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">Leak</span>
-        <span :style="{ color: theme === 'light' ? '#000' : '#fff' }">Alert</span>
+        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">BCWD </span>
+        <span :style="{ color: theme === 'light' ? '#000' : '#fff' }">Complaint System</span>
       </v-toolbar-title>
       <v-spacer />
       <v-btn icon variant="text" @click="toggleTheme">
@@ -57,7 +57,7 @@ watch(theme, (val) => (vuetifyTheme.global.name.value = val))
                   contain
                 />
                 <h2 class="font-weight-bold text-h5 mb-2">Create an Account</h2>
-                <p class="text-medium-emphasis">Join LeakAlert to start reporting leaks</p>
+                <p class="text-medium-emphasis">Register now to report leaks and services issues</p>
               </div>
 
               <RegisterForm />

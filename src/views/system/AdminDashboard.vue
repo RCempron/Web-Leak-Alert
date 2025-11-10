@@ -64,8 +64,8 @@ onMounted(loadReports)
     >
       <v-toolbar-title class="font-weight-bold text-h5 d-flex align-center">
         <v-img src="/images/LeakAlertLogo.png" width="34" height="34" class="mr-2" />
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">Leak</span>
-        <span class="text-black">Alert (Admin)</span>
+        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">BCWD </span>
+        <span class="text-black">Complaint System</span>
       </v-toolbar-title>
 
       <v-spacer />
