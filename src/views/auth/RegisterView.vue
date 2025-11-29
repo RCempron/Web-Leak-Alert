@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useDisplay, useTheme } from 'vuetify'
 import RegisterForm from '@/components/auth/RegisterForm.vue'
 
@@ -16,33 +16,77 @@ function toggleTheme() {
 }
 
 watch(theme, (val) => (vuetifyTheme.global.name.value = val))
+
+// -------- Philippine live date/time ----------
+const phTime = ref('')
+let timer = null
+
+function updatePhTime() {
+  const now = new Date()
+  phTime.value = new Intl.DateTimeFormat('en-PH', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Manila',
+  }).format(now)
+}
+
+onMounted(() => {
+  updatePhTime()
+  timer = setInterval(updatePhTime, 1000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
 </script>
 
 <template>
   <v-app>
+    <!-- Header -->
     <v-app-bar
       flat
       density="comfortable"
-      :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-4'"
-      class="px-4"
+      :color="theme === 'light' ? '#1565c0' : '#0f1720'"
+      class="px-2 px-sm-4 header-bar"
     >
-      <v-toolbar-title class="font-weight-bold" :class="mobile ? 'text-h6' : 'text-h5'">
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">BCWD </span>
-        <span :style="{ color: theme === 'light' ? '#000' : '#fff' }">Complaint System</span>
-      </v-toolbar-title>
+      <div class="d-flex align-center gap-2 gap-sm-4">
+        <!-- <v-img src="/images/LeakAlertLogo.png" width="40" height="40" alt="logo" /> -->
+        <div>
+          <div class="font-weight-bold" :class="mobile ? 'text-body-1' : 'text-h5'">
+            BCWD Complaint System
+          </div>
+        </div>
+      </div>
+
       <v-spacer />
-      <v-btn icon variant="text" @click="toggleTheme">
-        <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
+
+      <!-- Live PH time - Hidden on small mobile -->
+      <div class="mr-2 mr-sm-4 text-caption ph-time" :class="{ 'd-none d-sm-flex': mobile }">
+        {{ phTime }}
+      </div>
+
+      <!-- Theme toggle -->
+      <v-btn icon variant="text" @click="toggleTheme" :title="'Toggle theme'" size="small">
+        <v-icon size="20">{{
+          theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'
+        }}</v-icon>
       </v-btn>
     </v-app-bar>
 
     <v-main
-      class="d-flex align-center justify-center"
+      class="d-flex align-center justify-center pa-2 pa-sm-4 pa-md-6"
       :class="theme === 'light' ? 'bg-grey-lighten-5' : 'bg-grey-darken-4'"
     >
       <v-container class="px-4 py-8" fluid>
         <v-row justify="center">
           <v-col cols="12" sm="8" md="5" lg="4">
+            <br />
             <v-card
               class="pa-8"
               elevation="10"
@@ -75,18 +119,119 @@ watch(theme, (val) => (vuetifyTheme.global.name.value = val))
                 >
               </div>
             </v-card>
+            <br />
+          </v-col>
+        </v-row>
+
+        <!-- Footer Content Inside Main (for mobile) -->
+        <v-row v-if="mobile" class="mt-8">
+          <v-col cols="12" class="px-0">
+            <div
+              class="footer-mobile-content"
+              :class="theme === 'light' ? 'bg-footer-light' : 'bg-footer-dark'"
+            >
+              <div class="footer-content-mobile text-center py-4">
+                <div class="mb-3">
+                  <span class="text-caption font-weight-medium text-white"
+                    >&copy; 2025 BCWD Complaint System</span
+                  >
+                </div>
+
+                <div class="footer-contacts-mobile mb-3">
+                  <div class="contact-line mb-1">
+                    <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
+                    <span class="text-caption text-white"
+                      >Gov. Jose A. Rosales Ave., Butuan City</span
+                    >
+                  </div>
+                  <div class="contact-line mb-1">
+                    <v-icon size="12" class="mr-1 text-white">mdi-phone</v-icon>
+                    <span class="text-caption text-white">(085) 817-6635</span>
+                  </div>
+                  <div class="contact-line mb-1">
+                    <v-icon size="12" class="mr-1 text-white">mdi-cellphone</v-icon>
+                    <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
+                  </div>
+                  <div class="contact-line mb-1">
+                    <v-icon size="12" class="mr-1 text-white">mdi-email</v-icon>
+                    <span class="text-caption text-white">bcwdrecords@gmail.com</span>
+                  </div>
+                </div>
+
+                <div>
+                  <small class="text-caption font-weight-medium text-white"
+                    >Philippines (Asia/Manila)</small
+                  >
+                </div>
+              </div>
+            </div>
           </v-col>
         </v-row>
       </v-container>
     </v-main>
 
+    <!-- Footer (Desktop only) -->
     <v-footer
+      v-if="!mobile"
       app
-      class="text-center py-2"
-      height="48"
-      :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-3'"
+      class="py-2 footer-bar"
+      height="30"
+      :color="theme === 'light' ? '#0f5088' : '#0b1116'"
     >
-      <small>&copy; 2025 LeakAlert | All Rights Reserved</small>
+      <v-container class="pa-0">
+        <v-row no-gutters align="center" class="footer-content px-2 px-sm-4">
+          <!-- Copyright -->
+          <div class="footer-section copyright d-flex align-center">
+            <span class="text-caption font-weight-medium text-white"
+              >&copy; 2025 BCWD Complaint System</span
+            >
+          </div>
+
+          <v-spacer class="d-none d-md-flex" />
+
+          <!-- Contact Info - Horizontal Layout -->
+          <div class="footer-section contacts d-flex align-center justify-center flex-nowrap">
+            <!-- Address -->
+            <div class="contact-item d-flex align-center gap-1">
+              <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
+              <span class="text-caption text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
+            </div>
+
+            <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
+
+            <!-- Phone -->
+            <div class="contact-item d-flex align-center gap-1">
+              <v-icon size="12" class="mr-1 text-white">mdi-phone</v-icon>
+              <span class="text-caption text-white">(085) 817-6635</span>
+            </div>
+
+            <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
+
+            <!-- Mobile -->
+            <div class="contact-item d-flex align-center gap-1">
+              <v-icon size="12" class="mr-1 text-white">mdi-cellphone</v-icon>
+              <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
+            </div>
+
+            <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
+
+            <!-- Email -->
+            <div class="contact-item d-flex align-center gap-1">
+              <v-icon size="12" class="mr-1 text-white">mdi-email</v-icon>
+              <span class="text-caption text-white">bcwdrecords@gmail.com</span>
+            </div>
+          </div>
+
+          <v-spacer class="d-none d-md-flex" />
+
+          <!-- Time Zone -->
+          <div class="footer-section timezone d-flex align-center justify-end">
+            <small class="text-caption font-weight-medium text-white"
+              >Philippines (Asia/Manila)</small
+            >
+          </div>
+        </v-row>
+      </v-container>
     </v-footer>
   </v-app>
 </template>
@@ -100,5 +245,105 @@ watch(theme, (val) => (vuetifyTheme.global.name.value = val))
 }
 .bg-grey-darken-4 {
   background-color: #121212;
+}
+
+/* Footer background colors */
+.bg-footer-light {
+  background-color: #0f5088;
+}
+.bg-footer-dark {
+  background-color: #0b1116;
+}
+
+/* header tweaks */
+.header-bar {
+  color: #fff;
+}
+.header-sub {
+  opacity: 0.9;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* footer tweaks */
+.footer-bar {
+  color: #fff;
+}
+.footer-links a {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+/* Footer responsive styles */
+.footer-content {
+  flex-wrap: nowrap;
+  min-height: 52px;
+}
+
+.footer-section .text-caption {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.contacts {
+  gap: 0.5rem;
+}
+
+.contact-item,
+.divider-item {
+  transition: all 0.3s ease;
+}
+
+.divider-item {
+  opacity: 0.3;
+}
+
+/* Mobile footer inside main */
+.footer-mobile-content {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.footer-content-mobile {
+  color: white;
+}
+
+.footer-contacts-mobile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.contact-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* small styling for PH time */
+.ph-time {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Ensure main content has enough space on mobile */
+.v-main {
+  min-height: calc(100vh - 64px) !important;
+}
+
+/* Ensure white text colors */
+.text-white {
+  color: white !important;
+}
+
+/* Remove any potential white gaps */
+.v-application .v-main {
+  padding-bottom: 0 !important;
+}
+
+.v-container {
+  padding-bottom: 0 !important;
 }
 </style>
