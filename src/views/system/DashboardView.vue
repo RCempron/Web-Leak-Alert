@@ -38,7 +38,13 @@ async function logout() {
 // Dashboard cards (report icon color changed to red)
 const cards = [
   { title: 'Report a Leak', icon: 'mdi-water-alert', color: 'red', route: '/report' },
-  { title: 'My Reports', icon: 'mdi-format-list-bulleted', color: 'green', route: '/my-reports' },
+  {
+    title: 'My Reports',
+    icon: 'mdi-format-list-bulleted',
+    color: 'green',
+    route: '/my-reports',
+    notify: true,
+  },
   { title: 'Profile', icon: 'mdi-account-circle', color: 'deep-purple', route: '/profile' },
 ]
 
@@ -69,6 +75,23 @@ onMounted(() => {
 onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
+
+// 🔔 REPORT STATUS INDICATOR
+const hasUpdatedReport = ref(false)
+
+async function checkUpdatedReports() {
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData?.user) return
+
+  const { data } = await supabase
+    .from('reports')
+    .select('id, status')
+    .eq('user_id', userData.user.id)
+
+  hasUpdatedReport.value = (data || []).some((r) => r.status !== 'pending')
+}
+
+onMounted(checkUpdatedReports)
 </script>
 
 <template>
@@ -141,12 +164,15 @@ onUnmounted(() => {
             class="d-flex justify-center px-3 py-2"
           >
             <v-card
-              class="pa-4 pa-sm-6 hover-scale dashboard-card"
+              class="pa-4 pa-sm-6 hover-scale dashboard-card position-relative"
               :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
               elevation="6"
               rounded="xl"
               @click="router.push(card.route)"
             >
+              <!-- 🔔 STATUS UPDATED BANNER -->
+              <div v-if="card.notify && hasUpdatedReport" class="status-banner">STATUS UPDATED</div>
+
               <v-icon :color="card.color" :size="mobile ? 72 : 64" class="mb-3 mb-sm-4">{{
                 card.icon
               }}</v-icon>
@@ -602,5 +628,22 @@ onUnmounted(() => {
   .contact-line .text-caption {
     font-size: 0.55rem;
   }
+}
+
+/* 🔔 Status update banner */
+.status-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: linear-gradient(90deg, #ff9800, #ffc107);
+  color: #fff;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 0;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  letter-spacing: 1px;
 }
 </style>

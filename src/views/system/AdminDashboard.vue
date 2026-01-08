@@ -39,6 +39,44 @@ async function loadReports() {
   }
 }
 
+// ✅ UPDATE REPORT STATUS
+async function updateStatus(reportId, newStatus) {
+  try {
+    const { error } = await supabase
+      .from('reports')
+      .update({
+        status: newStatus,
+        updated_at: new Date(),
+      })
+      .eq('id', reportId)
+
+    if (error) throw error
+
+    // reload reports after update
+    loadReports()
+  } catch (err) {
+    alert('Failed to update report status.')
+    console.error(err)
+  }
+}
+// async function updateStatus(reportId, newStatus) {
+//   const { error } = await supabase
+//     .from('reports')
+//     .update({
+//       status: newStatus,
+//       updated_at: new Date(),
+//     })
+//     .eq('id', reportId)
+
+//   if (error) {
+//     console.error('Update failed:', error)
+//     return
+//   }
+
+//   // 🔄 Refresh list after update
+//   await loadReports()
+// }
+
 // 🖼️ IMAGE PREVIEW
 function openImages(imgs = []) {
   selectedImages.value = imgs
@@ -64,7 +102,7 @@ onMounted(loadReports)
     >
       <v-toolbar-title class="font-weight-bold text-h5 d-flex align-center">
         <v-img src="/images/LeakAlertLogo.png" width="34" height="34" class="mr-2" />
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">BCWD </span>
+        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'"> BCWD </span>
         <span class="text-black">Complaint System</span>
       </v-toolbar-title>
 
@@ -74,7 +112,7 @@ onMounted(loadReports)
         :prepend-icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
         @click="toggleTheme"
         variant="text"
-      ></v-btn>
+      />
 
       <v-btn prepend-icon="mdi-logout" color="error" variant="text" @click="logout"> Logout </v-btn>
     </v-app-bar>
@@ -96,7 +134,7 @@ onMounted(loadReports)
             >
               <h2 class="text-center font-weight-bold mb-1">Admin Dashboard</h2>
               <p class="text-center text-medium-emphasis mb-6">
-                View all leak reports submitted by users.
+                View and manage leak reports submitted by users.
               </p>
 
               <v-progress-circular
@@ -123,25 +161,22 @@ onMounted(loadReports)
                         <h3 class="mb-1 font-weight-medium">{{ rep.type }}</h3>
                         <small class="text-caption">User ID: {{ rep.user_id }}</small>
                       </div>
-                      <v-chip
-                        :color="
-                          rep.status === 'pending'
-                            ? 'orange'
-                            : rep.status === 'resolved'
-                              ? 'green'
-                              : rep.status === 'rejected'
-                                ? 'red'
-                                : 'blue'
-                        "
-                        class="text-white text-capitalize"
-                      >
-                        {{ rep.status }}
-                      </v-chip>
+
+                      <!-- 🔽 STATUS UPDATE -->
+                      <v-select
+                        :items="['pending', 'ongoing', 'resolved', 'rejected']"
+                        :model-value="rep.status"
+                        density="compact"
+                        variant="outlined"
+                        class="status-select"
+                        @update:modelValue="(val) => updateStatus(rep.id, val)"
+                      />
                     </div>
 
                     <p><strong>Severity:</strong> {{ rep.severity }}</p>
                     <p><strong>Landmark:</strong> {{ rep.landmark || 'N/A' }}</p>
                     <p><strong>Notes:</strong> {{ rep.notes || 'N/A' }}</p>
+
                     <p class="text-caption text-medium-emphasis mb-2">
                       Submitted: {{ new Date(rep.created_at).toLocaleString() }}
                     </p>
@@ -223,5 +258,8 @@ onMounted(loadReports)
 .modern-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+.status-select {
+  min-width: 140px;
 }
 </style>
