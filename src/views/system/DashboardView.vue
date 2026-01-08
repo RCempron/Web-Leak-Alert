@@ -83,15 +83,33 @@ async function checkUpdatedReports() {
   const { data: userData } = await supabase.auth.getUser()
   if (!userData?.user) return
 
+  const lastVisit = localStorage.getItem('lastMyReportsVisit')
+
   const { data } = await supabase
     .from('reports')
-    .select('id, status')
+    .select('status, updated_at')
     .eq('user_id', userData.user.id)
 
-  hasUpdatedReport.value = (data || []).some((r) => r.status !== 'pending')
+  if (!lastVisit) {
+    hasUpdatedReport.value = false
+    return
+  }
+
+  hasUpdatedReport.value = (data || []).some(
+    (r) => r.status !== 'pending' && r.updated_at && new Date(r.updated_at) > new Date(lastVisit),
+  )
 }
 
 onMounted(checkUpdatedReports)
+
+function handleCardClick(card) {
+  if (card.route === '/my-reports') {
+    localStorage.setItem('lastMyReportsVisit', new Date().toISOString())
+    hasUpdatedReport.value = false
+  }
+
+  router.push(card.route)
+}
 </script>
 
 <template>
@@ -168,7 +186,7 @@ onMounted(checkUpdatedReports)
               :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
               elevation="6"
               rounded="xl"
-              @click="router.push(card.route)"
+              @click="handleCardClick(card)"
             >
               <!-- 🔔 STATUS UPDATED BANNER -->
               <div v-if="card.notify && hasUpdatedReport" class="status-banner">STATUS UPDATED</div>
@@ -645,5 +663,26 @@ onMounted(checkUpdatedReports)
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   letter-spacing: 1px;
+}
+
+/* Slide-down animation */
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.35s ease;
+}
+
+.slide-down-enter-from {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+.slide-down-enter-to {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.slide-down-leave-to {
+  transform: translateY(-100%);
+  opacity: 0;
 }
 </style>

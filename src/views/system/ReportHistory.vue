@@ -85,6 +85,37 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+// 🟢 Status helpers
+function normalizeStatus(status) {
+  return status || 'pending'
+}
+
+function statusColor(status) {
+  switch (status) {
+    case 'ongoing':
+      return 'info'
+    case 'resolved':
+      return 'success'
+    case 'rejected':
+      return 'error'
+    default:
+      return 'warning' // pending
+  }
+}
+
+function statusLabel(status) {
+  switch (status) {
+    case 'ongoing':
+      return 'Ongoing'
+    case 'resolved':
+      return 'Resolved'
+    case 'rejected':
+      return 'Rejected'
+    default:
+      return 'Pending'
+  }
+}
 </script>
 
 <template>
@@ -183,9 +214,22 @@ onMounted(async () => {
                     :color="theme === 'light' ? 'grey-lighten-5' : 'blue-grey-darken-2'"
                     rounded="lg"
                   >
-                    <h3 class="font-weight-bold mb-1" :class="mobile ? 'text-body-1' : ''">
-                      {{ report.type }}
-                    </h3>
+                    <div class="d-flex justify-space-between align-center mb-1">
+                      <h3 class="font-weight-bold" :class="mobile ? 'text-body-1' : ''">
+                        {{ report.type }}
+                      </h3>
+
+                      <!-- 🏷️ STATUS CHIP -->
+                      <v-chip
+                        size="small"
+                        label
+                        class="text-uppercase font-weight-medium"
+                        :color="statusColor(normalizeStatus(report.status))"
+                      >
+                        {{ statusLabel(normalizeStatus(report.status)) }}
+                      </v-chip>
+                    </div>
+
                     <p class="text-body-2 mb-1">Severity: {{ report.severity }}</p>
                     <p class="text-body-2 mb-1">Landmark: {{ report.landmark || 'N/A' }}</p>
                     <p class="text-body-2 mb-2">Notes: {{ report.notes || 'N/A' }}</p>
