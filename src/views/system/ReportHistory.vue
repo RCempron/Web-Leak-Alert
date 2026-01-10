@@ -116,6 +116,19 @@ function statusLabel(status) {
       return 'Pending'
   }
 }
+
+// 🧱 Pipe location label helper
+function pipeLocationLabel(value) {
+  const map = {
+    mainline: 'Mainline',
+    transition: 'Transition Line',
+    distribution: 'Distribution Line',
+    service: 'Service Line',
+    unknown: 'Not sure',
+  }
+
+  return map[value] || 'Not specified'
+}
 </script>
 
 <template>
@@ -231,7 +244,13 @@ function statusLabel(status) {
                     </div>
 
                     <p class="text-body-2 mb-1">Severity: {{ report.severity }}</p>
+
+                    <p class="text-body-2 mb-1">
+                      Pipe Location: {{ pipeLocationLabel(report.pipe_location) }}
+                    </p>
+
                     <p class="text-body-2 mb-1">Landmark: {{ report.landmark || 'N/A' }}</p>
+
                     <p class="text-body-2 mb-2">Notes: {{ report.notes || 'N/A' }}</p>
                     <p class="text-caption text-medium-emphasis">
                       Submitted: {{ new Date(report.created_at).toLocaleString() }}

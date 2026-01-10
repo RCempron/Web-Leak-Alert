@@ -151,6 +151,7 @@ async function submitReport() {
         latitude: latitude.value,
         longitude: longitude.value,
         images: uploadedUrls.length ? uploadedUrls : null,
+        pipe_location: pipeLocation.value || null,
         status: 'pending',
       },
     ])
@@ -165,6 +166,17 @@ async function submitReport() {
     formAction.value.formProcess = false
   }
 }
+
+// Pipe location
+const pipeLocation = ref(null)
+
+const pipeLocationOptions = [
+  { value: 'mainline', title: 'Mainline – Large pipes along major roads' },
+  { value: 'transition', title: 'Transition Line – Connects main pipes to neighborhoods' },
+  { value: 'distribution', title: 'Distribution Line – Pipes within streets and barangays' },
+  { value: 'service', title: 'Service Line – Pipe connecting directly to a house' },
+  { value: 'unknown', title: 'Not sure – I am not certain' },
+]
 </script>
 
 <template>
@@ -253,6 +265,23 @@ async function submitReport() {
                       :rules="[(v) => !!v || 'Severity is required']"
                       variant="outlined"
                     />
+                  </v-col>
+                </v-row>
+
+                <v-row>
+                  <v-col cols="12">
+                    <v-select
+                      v-model="pipeLocation"
+                      :items="pipeLocationOptions"
+                      item-title="title"
+                      item-value="value"
+                      label="Pipe Location (Optional)"
+                      variant="outlined"
+                      clearable
+                    />
+                    <small class="text-caption text-medium-emphasis">
+                      Helps BCWD identify where the pipe is located. If unsure, select “Not sure”.
+                    </small>
                   </v-col>
                 </v-row>
 

@@ -166,6 +166,17 @@ function zoomOut() {
 function resetZoom() {
   zoomLevel.value = 1
 }
+
+function formatPipeLocation(value) {
+  const map = {
+    mainline: 'Mainline',
+    transition: 'Transition Line',
+    distribution: 'Distribution Line',
+    service: 'Service Line',
+    unknown: 'Not sure',
+  }
+  return map[value] || value
+}
 </script>
 
 <template>
@@ -268,6 +279,15 @@ function resetZoom() {
                     <v-expand-transition>
                       <div v-show="expandedReportId === rep.id">
                         <p><strong>Severity:</strong> {{ rep.severity }}</p>
+                        <p>
+                          <strong>Pipe Location:</strong>
+                          {{
+                            rep.pipe_location
+                              ? formatPipeLocation(rep.pipe_location)
+                              : 'Not specified'
+                          }}
+                        </p>
+
                         <p><strong>Landmark:</strong> {{ rep.landmark || 'N/A' }}</p>
                         <p><strong>Notes:</strong> {{ rep.notes || 'N/A' }}</p>
 
