@@ -3,6 +3,9 @@
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'vue-router'
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useDisplay } from 'vuetify'
+
+const { mobile } = useDisplay()
 
 const router = useRouter()
 
@@ -210,27 +213,24 @@ onUnmounted(() => {
 <template>
   <v-app :theme="theme">
     <!-- HEADER -->
-    <v-app-bar flat density="comfortable" color="#1565c0" class="px-4 header-bar">
+    <v-app-bar flat density="comfortable" color="#1565c0" class="px-2 px-sm-4 header-bar">
+      <!-- Title -->
       <div class="d-flex align-center">
-        <div class="font-weight-bold text-h5 text-white">BCWD Complaint System</div>
+        <div class="font-weight-bold text-white" :class="mobile ? 'text-body-1' : 'text-h5'">
+          BCWD Complaint System
+        </div>
       </div>
 
       <v-spacer />
 
-      <!-- Live PH Time -->
-      <div class="mr-4 text-caption ph-time">
+      <!-- Live PH Time (HIDDEN on mobile) -->
+      <div v-if="!mobile" class="mr-4 text-caption ph-time">
         {{ phTime }}
       </div>
 
-      <!-- Theme toggle (still functional) -->
-      <v-btn icon variant="text" @click="toggleTheme" size="small">
-        <v-icon size="20" class="text-white">
-          {{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}
-        </v-icon>
-      </v-btn>
-
-      <v-btn prepend-icon="mdi-logout" variant="text" class="text-white" @click="logout">
-        Logout
+      <!-- Logout (icon-only on mobile) -->
+      <v-btn icon variant="text" class="text-white" @click="logout" :title="'Logout'">
+        <v-icon>mdi-logout</v-icon>
       </v-btn>
     </v-app-bar>
 
