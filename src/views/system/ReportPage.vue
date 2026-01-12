@@ -1,178 +1,64 @@
-<template>
-  <v-app :theme="theme">
-    <!-- Header -->
-    <v-app-bar
-      flat
-      :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-4'"
-      class="px-6"
-    >
-      <v-toolbar-title class="font-weight-bold text-h5 d-flex align-center">
-        <v-img
-          src="/images/LeakAlertLogo.png"
-          alt="LeakAlert Logo"
-          width="36"
-          height="36"
-          class="mr-2"
-        />
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'">Leak</span>
-        <span class="text-black">Alert</span>
-      </v-toolbar-title>
-
-      <v-spacer></v-spacer>
-
-      <v-btn
-        :prepend-icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-        @click="toggleTheme"
-        variant="text"
-      ></v-btn>
-    </v-app-bar>
-
-    <!-- Main -->
-    <v-main
-      class="main-section d-flex align-center justify-center"
-      :class="theme === 'light' ? 'bg-grey-lighten-5' : 'bg-grey-darken-4'"
-    >
-      <v-container class="fill-height d-flex align-center justify-center">
-        <v-row justify="center" class="w-100">
-          <v-col cols="12" sm="10" md="9" lg="8" xl="6">
-            <v-card
-              class="pa-8 text-left modern-card mx-auto"
-              elevation="10"
-              rounded="xl"
-              max-width="900"
-              :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
-            >
-              <h3 class="font-weight-bold mb-2 text-center">Report a Leak</h3>
-              <p class="text-medium-emphasis mb-4 text-center">
-                Provide details and optional photos. Capture your location for faster response.
-              </p>
-
-              <AlertNotification
-                :form-success-message="formAction.formSuccessMessage"
-                :form-error-message="formAction.formErrorMessage"
-              />
-
-              <v-form ref="refVForm">
-                <v-row>
-                  <v-col cols="12" md="6">
-                    <v-select
-                      v-model="type"
-                      :items="reportTypes"
-                      label="Type of leak"
-                      :rules="[(v) => !!v || 'Type is required']"
-                      variant="outlined"
-                    />
-                  </v-col>
-
-                  <v-col cols="12" md="6">
-                    <v-select
-                      v-model="severity"
-                      :items="severities"
-                      label="Severity"
-                      :rules="[(v) => !!v || 'Severity is required']"
-                      variant="outlined"
-                    />
-                  </v-col>
-                </v-row>
-
-                <v-text-field
-                  v-model="landmark"
-                  label="Landmark / Nearest place"
-                  variant="outlined"
-                  class="mb-3"
-                />
-                <v-textarea
-                  v-model="notes"
-                  label="Additional notes"
-                  rows="3"
-                  variant="outlined"
-                  class="mb-3"
-                />
-
-                <!-- Location -->
-                <div class="my-4">
-                  <div class="d-flex align-center gap-3 mb-2 flex-wrap">
-                    <v-btn small @click="captureLocation" :loading="fetchingLocation">
-                      Capture device location
-                    </v-btn>
-                    <span v-if="latitude && longitude" class="text-caption">
-                      Lat: {{ latitude.toFixed(6) }}, Lng: {{ longitude.toFixed(6) }}
-                    </span>
-                    <span v-else class="text-caption">No location captured</span>
-                  </div>
-                  <small class="text-caption">
-                    If geolocation fails, write the place in Landmark.
-                  </small>
-                </div>
-
-                <!-- File Upload -->
-                <div class="my-3">
-                  <label class="mb-1">Attach photos (max 4)</label>
-                  <input type="file" accept="image/*" multiple @change="onFilesChange" />
-                  <v-row class="mt-3" dense>
-                    <v-col v-for="(p, i) in previews" :key="i" cols="6" sm="4" md="3">
-                      <v-card class="pa-2 rounded-lg elevation-2">
-                        <v-img :src="p" height="120" contain rounded />
-                        <v-row justify="space-between" class="mt-2">
-                          <small class="text-caption">{{ files[i]?.name }}</small>
-                          <v-btn icon small @click="removePreview(i)">
-                            <v-icon>mdi-close</v-icon>
-                          </v-btn>
-                        </v-row>
-                      </v-card>
-                    </v-col>
-                  </v-row>
-                </div>
-
-                <!-- Actions -->
-                <div
-                  class="d-flex flex-column flex-sm-row justify-space-between align-center mt-6 gap-3"
-                >
-                  <v-btn variant="outlined" size="large" @click="$router.replace('/dashboard')">
-                    <v-icon start>mdi-arrow-left</v-icon> Back
-                  </v-btn>
-
-                  <v-btn
-                    color="primary"
-                    size="large"
-                    :loading="formAction.formProcess"
-                    :disabled="formAction.formProcess || !canSubmit"
-                    @click="submitReport"
-                  >
-                    <v-icon start>mdi-send</v-icon> Submit Report
-                  </v-btn>
-                </div>
-              </v-form>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-main>
-
-    <!-- Footer -->
-    <v-footer
-      class="text-center py-2"
-      :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-3'"
-    >
-      <small>&copy; 2025 LeakAlert | All Rights Reserved</small>
-    </v-footer>
-  </v-app>
-</template>
-
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useDisplay, useTheme } from 'vuetify'
 import { supabase } from '@/utils/supabase'
 import AlertNotification from '@/components/common/AlertNotification.vue'
 
-// 🌗 Theme toggle (shared across app)
-const theme = ref(localStorage.getItem('theme') || 'light')
-const toggleTheme = () => {
+const { mobile } = useDisplay()
+const router = useRouter()
+
+// Vuetify theme helper
+const vuetifyTheme = useTheme()
+
+// Persistent theme (read from localStorage)
+const theme = ref(localStorage.getItem('theme') ?? 'light')
+
+// Apply initial theme to Vuetify (use change to avoid deprecated assignment warnings)
+vuetifyTheme.change(theme.value)
+
+// toggle theme (and persist)
+function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', theme.value)
+  vuetifyTheme.change(theme.value)
 }
 
-const router = useRouter()
+// Logout function
+async function logout() {
+  await supabase.auth.signOut()
+  router.push('/login')
+}
+
+// -------- Philippine live date/time ----------
+const phTime = ref('')
+let timer = null
+
+function updatePhTime() {
+  const now = new Date()
+  phTime.value = new Intl.DateTimeFormat('en-PH', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Manila',
+  }).format(now)
+}
+
+onMounted(() => {
+  updatePhTime()
+  timer = setInterval(updatePhTime, 1000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
+
+// Report form logic
 const refVForm = ref(null)
 
 const reportTypes = ['Broken Pipe', 'Water Leak', 'Low Pressure', 'Contamination', 'Other']
@@ -265,6 +151,7 @@ async function submitReport() {
         latitude: latitude.value,
         longitude: longitude.value,
         images: uploadedUrls.length ? uploadedUrls : null,
+        pipe_location: pipeLocation.value || null,
         status: 'pending',
       },
     ])
@@ -279,7 +166,306 @@ async function submitReport() {
     formAction.value.formProcess = false
   }
 }
+
+// Pipe location
+const pipeLocation = ref(null)
+
+const pipeLocationOptions = [
+  { value: 'mainline', title: 'Mainline – Large pipes along major roads' },
+  { value: 'transition', title: 'Transition Line – Connects main pipes to neighborhoods' },
+  { value: 'distribution', title: 'Distribution Line – Pipes within streets and barangays' },
+  { value: 'service', title: 'Service Line – Pipe connecting directly to a house' },
+  { value: 'unknown', title: 'Not sure – I am not certain' },
+]
 </script>
+
+<template>
+  <v-app :theme="theme">
+    <!-- Header -->
+    <v-app-bar
+      flat
+      density="comfortable"
+      :color="theme === 'light' ? '#1565c0' : '#0f1720'"
+      class="px-2 px-sm-4 header-bar"
+    >
+      <div class="d-flex align-center gap-2 gap-sm-4">
+        <!-- <v-img src="/images/LeakAlertLogo.png" width="40" height="40" alt="logo" /> -->
+        <div>
+          <div class="font-weight-bold" :class="mobile ? 'text-body-1' : 'text-h5'">
+            BCWD Complaint System
+          </div>
+        </div>
+      </div>
+
+      <v-spacer />
+
+      <!-- Live PH time - Hidden on small mobile -->
+      <div class="mr-2 mr-sm-4 text-caption ph-time" :class="{ 'd-none d-sm-flex': mobile }">
+        {{ phTime }}
+      </div>
+
+      <!-- Theme toggle -->
+      <v-btn icon variant="text" @click="toggleTheme" :title="'Toggle theme'" size="small">
+        <v-icon size="20">{{
+          theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'
+        }}</v-icon>
+      </v-btn>
+
+      <!-- Logout -->
+      <v-btn icon variant="text" color="white" @click="logout" :title="'Logout'" size="small">
+        <v-icon size="20">mdi-logout</v-icon>
+      </v-btn>
+    </v-app-bar>
+
+    <!-- Main -->
+    <v-main
+      class="pa-2 pa-sm-4 pa-md-6"
+      :class="theme === 'light' ? 'bg-grey-lighten-5' : 'bg-grey-darken-4'"
+    >
+      <br /><br /><br />
+      <v-container class="px-3 px-sm-3">
+        <v-row justify="center" class="w-100 mx-0">
+          <v-col cols="12" sm="10" md="8" lg="7" xl="6" class="px-0">
+            <v-card
+              class="pa-4 pa-sm-8 text-left modern-card mx-auto"
+              elevation="10"
+              rounded="xl"
+              max-width="900"
+              :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
+            >
+              <h3 class="font-weight-bold mb-2 text-center" :class="mobile ? 'text-h6' : ''">
+                File a complaint
+              </h3>
+              <p class="text-medium-emphasis mb-4 text-center" :class="mobile ? 'text-body-2' : ''">
+                Provide details and optional photos. Capture your location for faster response.
+              </p>
+
+              <AlertNotification
+                :form-success-message="formAction.formSuccessMessage"
+                :form-error-message="formAction.formErrorMessage"
+              />
+
+              <v-form ref="refVForm">
+                <v-row>
+                  <v-col cols="12" md="6">
+                    <v-select
+                      v-model="type"
+                      :items="reportTypes"
+                      label="Type of leak"
+                      :rules="[(v) => !!v || 'Type is required']"
+                      variant="outlined"
+                    />
+                  </v-col>
+
+                  <v-col cols="12" md="6">
+                    <v-select
+                      v-model="severity"
+                      :items="severities"
+                      label="Severity"
+                      :rules="[(v) => !!v || 'Severity is required']"
+                      variant="outlined"
+                    />
+                  </v-col>
+                </v-row>
+
+                <v-row>
+                  <v-col cols="12">
+                    <v-select
+                      v-model="pipeLocation"
+                      :items="pipeLocationOptions"
+                      item-title="title"
+                      item-value="value"
+                      label="Pipe Location (Optional)"
+                      variant="outlined"
+                      clearable
+                    />
+                    <small class="text-caption text-medium-emphasis">
+                      Helps BCWD identify where the pipe is located. If unsure, select “Not sure”.
+                    </small>
+                  </v-col>
+                </v-row>
+
+                <v-text-field
+                  v-model="landmark"
+                  label="Landmark / Nearest place"
+                  variant="outlined"
+                  class="mb-3"
+                />
+                <v-textarea
+                  v-model="notes"
+                  label="Additional notes"
+                  rows="3"
+                  variant="outlined"
+                  class="mb-3"
+                />
+
+                <!-- Location -->
+                <div class="my-4">
+                  <div class="d-flex align-center gap-3 mb-2 flex-wrap">
+                    <v-btn small @click="captureLocation" :loading="fetchingLocation">
+                      Capture device location
+                    </v-btn>
+                    <span v-if="latitude && longitude" class="text-caption">
+                      Lat: {{ latitude.toFixed(6) }}, Lng: {{ longitude.toFixed(6) }}
+                    </span>
+                    <span v-else class="text-caption"> No location captured</span>
+                  </div>
+                  <small class="text-caption">
+                    If geolocation fails, write the place in Landmark.
+                  </small>
+                </div>
+
+                <!-- File Upload -->
+                <div class="my-3">
+                  <label class="mb-1">Attach photos (max 4)</label>
+                  <input type="file" accept="image/*" multiple @change="onFilesChange" />
+                  <v-row class="mt-3" dense>
+                    <v-col v-for="(p, i) in previews" :key="i" cols="6" sm="4" md="3">
+                      <v-card class="pa-2 rounded-lg elevation-2">
+                        <v-img :src="p" height="120" contain rounded />
+                        <v-row justify="space-between" class="mt-2">
+                          <small class="text-caption">{{ files[i]?.name }}</small>
+                          <v-btn icon small @click="removePreview(i)">
+                            <v-icon>mdi-close</v-icon>
+                          </v-btn>
+                        </v-row>
+                      </v-card>
+                    </v-col>
+                  </v-row>
+                </div>
+
+                <!-- Actions -->
+                <div
+                  class="d-flex flex-column flex-sm-row justify-space-between align-center mt-6 gap-3"
+                >
+                  <v-btn variant="outlined" size="large" @click="$router.replace('/dashboard')">
+                    <v-icon start>mdi-arrow-left</v-icon> Back
+                  </v-btn>
+
+                  <v-btn
+                    color="primary"
+                    size="large"
+                    :loading="formAction.formProcess"
+                    :disabled="formAction.formProcess || !canSubmit"
+                    @click="submitReport"
+                  >
+                    <v-icon start>mdi-send</v-icon> Submit Report
+                  </v-btn>
+                </div>
+              </v-form>
+            </v-card>
+            <br /><br /><br /><br />
+          </v-col>
+        </v-row>
+      </v-container>
+      <!-- Footer Content Inside Main (for mobile) - Outside container -->
+      <v-row v-if="mobile" class="mt-8 mx-0">
+        <v-col cols="12" class="px-0">
+          <div
+            class="footer-mobile-content"
+            :class="theme === 'light' ? 'bg-footer-light' : 'bg-footer-dark'"
+          >
+            <div class="footer-content-mobile text-center py-4">
+              <div class="mb-3">
+                <span class="text-caption font-weight-medium text-white"
+                  >&copy; 2025 BCWD Complaint System</span
+                >
+              </div>
+
+              <div class="footer-contacts-mobile mb-3">
+                <div class="contact-line mb-1">
+                  <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
+                  <span class="text-caption text-white"
+                    >Gov. Jose A. Rosales Ave., Butuan City</span
+                  >
+                </div>
+                <div class="contact-line mb-1">
+                  <v-icon size="12" class="mr-1 text-white">mdi-phone</v-icon>
+                  <span class="text-caption text-white">(085) 817-6635</span>
+                </div>
+                <div class="contact-line mb-1">
+                  <v-icon size="12" class="mr-1 text-white">mdi-cellphone</v-icon>
+                  <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
+                </div>
+                <div class="contact-line mb-1">
+                  <v-icon size="12" class="mr-1 text-white">mdi-email</v-icon>
+                  <span class="text-caption text-white">bcwdrecords@gmail.com</span>
+                </div>
+              </div>
+
+              <div>
+                <small class="text-caption font-weight-medium text-white"
+                  >Philippines (Asia/Manila)</small
+                >
+              </div>
+            </div>
+          </div>
+        </v-col>
+      </v-row>
+    </v-main>
+    <!-- Footer (Desktop only) -->
+    <v-footer
+      v-if="!mobile"
+      app
+      class="py-2 footer-bar"
+      height="auto"
+      :color="theme === 'light' ? '#0f5088' : '#0b1116'"
+    >
+      <v-container class="pa-0">
+        <v-row no-gutters align="center" class="footer-content px-2 px-sm-4 justify-space-between">
+          <!-- Copyright - Left -->
+          <div class="footer-section copyright d-flex align-center">
+            <span class="text-caption font-weight-medium text-white"
+              >&copy; 2025 BCWD Complaint System</span
+            >
+          </div>
+
+          <!-- Contact Info - Center -->
+          <div
+            class="footer-section contacts d-flex align-center justify-center flex-nowrap flex-grow-1 mx-4"
+          >
+            <!-- Address -->
+            <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
+              <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
+              <span class="text-caption text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
+            </div>
+
+            <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
+
+            <!-- Phone -->
+            <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
+              <v-icon size="12" class="mr-1 text-white">mdi-phone</v-icon>
+              <span class="text-caption text-white">(085) 817-6635</span>
+            </div>
+
+            <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
+
+            <!-- Mobile -->
+            <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
+              <v-icon size="12" class="mr-1 text-white">mdi-cellphone</v-icon>
+              <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
+            </div>
+
+            <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
+
+            <!-- Email -->
+            <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
+              <v-icon size="12" class="mr-1 text-white">mdi-email</v-icon>
+              <span class="text-caption text-white">bcwdrecords@gmail.com</span>
+            </div>
+          </div>
+
+          <!-- Time Zone - Right -->
+          <div class="footer-section timezone d-flex align-center">
+            <small class="text-caption font-weight-medium text-white"
+              >Philippines (Asia/Manila)</small
+            >
+          </div>
+        </v-row>
+      </v-container>
+    </v-footer>
+  </v-app>
+</template>
 
 <style scoped>
 .text-blue {
@@ -294,17 +480,285 @@ async function submitReport() {
 .bg-grey-darken-4 {
   background-color: #121212;
 }
-.main-section {
-  min-height: calc(100vh - 64px - 48px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+
+/* header tweaks */
+.header-bar {
+  color: #fff;
 }
+.header-sub {
+  opacity: 0.9;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* small styling for PH time */
+.ph-time {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Card styling */
 .modern-card {
   transition: all 0.3s ease;
 }
 .modern-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Ensure main content has enough space on mobile */
+.v-main {
+  min-height: calc(100vh - 64px) !important;
+}
+
+/* Remove any potential white gaps */
+.v-application .v-main {
+  padding-bottom: 0 !important;
+}
+
+.v-container {
+  padding-bottom: 0 !important;
+}
+
+/* Add this to your style section */
+.v-container {
+  max-width: 100% !important;
+}
+
+@media (min-width: 600px) {
+  .v-container {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+}
+
+/* Footer background colors */
+.bg-footer-light {
+  background-color: #0f5088;
+}
+.bg-footer-dark {
+  background-color: #0b1116;
+}
+
+/* footer tweaks */
+.footer-bar {
+  color: #fff;
+}
+.footer-links a {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+/* Footer responsive styles */
+.footer-content {
+  flex-wrap: nowrap;
+  min-height: 52px;
+}
+
+.footer-section .text-caption {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.contacts {
+  gap: 0;
+}
+
+.contact-item,
+.divider-item {
+  transition: all 0.3s ease;
+}
+
+.divider-item {
+  opacity: 0.3;
+}
+
+/* Ensure consistent spacing on all screen sizes */
+@media (max-width: 1279px) {
+  .footer-section .text-caption {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 959px) {
+  .footer-content {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+  }
+
+  .contacts {
+    order: 1;
+    flex: 1 1 100%;
+    justify-content: center;
+    margin: 0.5rem 0;
+  }
+
+  .copyright {
+    order: 2;
+  }
+
+  .timezone {
+    order: 3;
+  }
+}
+
+@media (max-width: 767px) {
+  .contacts {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .contact-item {
+    flex: 1 1 calc(50% - 1rem);
+    justify-content: center;
+    min-width: 140px;
+  }
+
+  .divider-item {
+    display: none;
+  }
+}
+
+/* Mobile footer inside main */
+.footer-mobile-content {
+  width: 100%;
+}
+
+.footer-content-mobile {
+  color: white;
+}
+
+.footer-contacts-mobile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.contact-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ensure white text colors */
+.text-white {
+  color: white !important;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 1279px) {
+  .footer-section .text-caption {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 959px) {
+  .footer-content {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+  }
+
+  .footer-section {
+    justify-content: center !important;
+    flex: 1 1 100%;
+  }
+
+  .contacts {
+    order: 1;
+    gap: 0.75rem;
+  }
+
+  .copyright {
+    order: 2;
+  }
+
+  .timezone {
+    order: 3;
+  }
+
+  .footer-section .text-caption {
+    font-size: 0.65rem;
+  }
+
+  .contact-item .v-icon {
+    margin-right: 2px !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .contacts {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .contact-item {
+    flex: 1 1 calc(50% - 1rem);
+    justify-content: center;
+    min-width: 140px;
+  }
+
+  .divider-item {
+    display: none;
+  }
+
+  .footer-section .text-caption {
+    font-size: 0.6rem;
+  }
+
+  .footer-content-mobile .text-caption {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 599px) {
+  .footer-content-mobile .text-caption {
+    font-size: 0.7rem;
+  }
+
+  .contact-line .text-caption {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .footer-content {
+    gap: 0.25rem;
+  }
+
+  .footer-section .text-caption {
+    font-size: 0.5rem;
+  }
+
+  .footer-content-mobile .text-caption {
+    font-size: 0.65rem;
+  }
+
+  .contact-line .text-caption {
+    font-size: 0.6rem;
+  }
+
+  .contact-item .v-icon {
+    font-size: 10px !important;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 360px) {
+  .footer-bar {
+    min-height: 48px;
+  }
+
+  .footer-content-mobile .text-caption {
+    font-size: 0.6rem;
+  }
+
+  .contact-line .text-caption {
+    font-size: 0.55rem;
+  }
 }
 </style>
