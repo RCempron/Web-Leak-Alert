@@ -1,8 +1,8 @@
 <!-- src/views/system/AdminDashboard.vue -->
 <script setup>
-import { ref, onMounted } from 'vue'
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const router = useRouter()
 
@@ -177,31 +177,61 @@ function formatPipeLocation(value) {
   }
   return map[value] || value
 }
+
+// 🇵🇭 Philippine live date & time
+const phTime = ref('')
+let timer = null
+
+function updatePhTime() {
+  const now = new Date()
+  phTime.value = new Intl.DateTimeFormat('en-PH', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Manila',
+  }).format(now)
+}
+
+onMounted(() => {
+  updatePhTime()
+  timer = setInterval(updatePhTime, 1000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
 </script>
 
 <template>
   <v-app :theme="theme">
     <!-- HEADER -->
-    <v-app-bar
-      flat
-      :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-4'"
-      class="px-6"
-    >
-      <v-toolbar-title class="font-weight-bold text-h5 d-flex align-center">
-        <v-img src="/images/LeakAlertLogo.png" width="34" height="34" class="mr-2" />
-        <span :class="theme === 'light' ? 'text-blue' : 'text-blue-lighten-3'"> BCWD </span>
-        <span class="text-black">Complaint System</span>
-      </v-toolbar-title>
+    <v-app-bar flat density="comfortable" color="#1565c0" class="px-4 header-bar">
+      <div class="d-flex align-center">
+        <div class="font-weight-bold text-h5 text-white">BCWD Complaint System</div>
+      </div>
 
       <v-spacer />
 
-      <v-btn
-        :prepend-icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-        @click="toggleTheme"
-        variant="text"
-      />
+      <!-- Live PH Time -->
+      <div class="mr-4 text-caption ph-time">
+        {{ phTime }}
+      </div>
 
-      <v-btn prepend-icon="mdi-logout" color="error" variant="text" @click="logout"> Logout </v-btn>
+      <!-- Theme toggle (still functional) -->
+      <v-btn icon variant="text" @click="toggleTheme" size="small">
+        <v-icon size="20" class="text-white">
+          {{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}
+        </v-icon>
+      </v-btn>
+
+      <v-btn prepend-icon="mdi-logout" variant="text" class="text-white" @click="logout">
+        Logout
+      </v-btn>
     </v-app-bar>
 
     <!-- MAIN -->
@@ -332,11 +362,17 @@ function formatPipeLocation(value) {
     </v-main>
 
     <!-- FOOTER -->
-    <v-footer
-      class="text-center py-2"
-      :color="theme === 'light' ? 'blue-lighten-5' : 'blue-grey-darken-3'"
-    >
-      <small>&copy; 2025 LeakAlert | Admin Portal</small>
+    <!-- FOOTER -->
+    <v-footer app height="32" color="#0f5088" class="footer-bar">
+      <v-container class="pa-0">
+        <v-row no-gutters align="center" class="px-4">
+          <span class="text-caption text-white"> © 2025 BCWD Complaint System </span>
+
+          <v-spacer />
+
+          <small class="text-caption text-white"> Philippines (Asia/Manila) </small>
+        </v-row>
+      </v-container>
     </v-footer>
 
     <!-- IMAGE MODAL -->
@@ -453,5 +489,21 @@ function formatPipeLocation(value) {
   max-height: 70vh;
   transition: transform 0.2s ease;
   transform-origin: center center;
+}
+
+/* Header & footer branding */
+.header-bar {
+  color: #fff;
+}
+
+.footer-bar {
+  color: #fff;
+}
+
+/* PH time styling */
+.ph-time {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+  white-space: nowrap;
 }
 </style>
