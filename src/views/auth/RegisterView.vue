@@ -80,13 +80,13 @@ onUnmounted(() => {
     </v-app-bar>
 
     <v-main
-      class="d-flex align-center justify-center pa-2 pa-sm-4 pa-md-6"
+      class="d-flex flex-column pa-0"
       :class="theme === 'light' ? 'bg-grey-lighten-5' : 'bg-grey-darken-4'"
     >
-      <v-container class="px-4 py-8" fluid>
-        <v-row justify="center">
+      <v-container class="px-4 py-8 flex-grow-1" fluid>
+        <!-- Top margin prevents cutting by header, bottom margin adds space under card -->
+        <v-row justify="center" class="mt-8 mt-sm-12 mt-md-16 mb-8 mb-sm-12">
           <v-col cols="12" sm="8" md="5" lg="4">
-            <br />
             <v-card
               class="pa-8"
               elevation="10"
@@ -119,55 +119,49 @@ onUnmounted(() => {
                 >
               </div>
             </v-card>
-            <br />
-          </v-col>
-        </v-row>
-
-        <!-- Footer Content Inside Main (for mobile) -->
-        <v-row v-if="mobile" class="mt-8">
-          <v-col cols="12" class="px-0">
-            <div
-              class="footer-mobile-content"
-              :class="theme === 'light' ? 'bg-footer-light' : 'bg-footer-dark'"
-            >
-              <div class="footer-content-mobile text-center py-4">
-                <div class="mb-3">
-                  <span class="text-caption font-weight-medium text-white"
-                    >&copy; 2025 BCWD Complaint System</span
-                  >
-                </div>
-
-                <div class="footer-contacts-mobile mb-3">
-                  <div class="contact-line mb-1">
-                    <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
-                    <span class="text-caption text-white"
-                      >Gov. Jose A. Rosales Ave., Butuan City</span
-                    >
-                  </div>
-                  <div class="contact-line mb-1">
-                    <v-icon size="12" class="mr-1 text-white">mdi-phone</v-icon>
-                    <span class="text-caption text-white">(085) 817-6635</span>
-                  </div>
-                  <div class="contact-line mb-1">
-                    <v-icon size="12" class="mr-1 text-white">mdi-cellphone</v-icon>
-                    <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
-                  </div>
-                  <div class="contact-line mb-1">
-                    <v-icon size="12" class="mr-1 text-white">mdi-email</v-icon>
-                    <span class="text-caption text-white">bcwdrecords@gmail.com</span>
-                  </div>
-                </div>
-
-                <div>
-                  <small class="text-caption font-weight-medium text-white"
-                    >Philippines (Asia/Manila)</small
-                  >
-                </div>
-              </div>
-            </div>
           </v-col>
         </v-row>
       </v-container>
+
+      <!-- Mobile Footer – full width, no side/bottom gaps -->
+      <div
+        v-if="mobile"
+        class="footer-mobile-fullwidth"
+        :class="theme === 'light' ? 'bg-footer-light' : 'bg-footer-dark'"
+      >
+        <div class="footer-content-mobile text-center py-3 px-3">
+          <div class="mb-3">
+            <span class="text-caption font-weight-medium text-white"
+              >&copy; 2025 BCWD Complaint System</span
+            >
+          </div>
+
+          <div class="footer-contacts-mobile mb-3">
+            <div class="contact-line mb-2">
+              <v-icon size="14" class="mr-2 text-white">mdi-map-marker</v-icon>
+              <span class="text-caption text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
+            </div>
+            <div class="contact-line mb-2">
+              <v-icon size="14" class="mr-2 text-white">mdi-phone</v-icon>
+              <span class="text-caption text-white">(085) 817-6635</span>
+            </div>
+            <div class="contact-line mb-2">
+              <v-icon size="14" class="mr-2 text-white">mdi-cellphone</v-icon>
+              <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
+            </div>
+            <div class="contact-line">
+              <v-icon size="14" class="mr-2 text-white">mdi-email</v-icon>
+              <span class="text-caption text-white">bcwdrecords@gmail.com</span>
+            </div>
+          </div>
+
+          <div>
+            <small class="text-caption font-weight-medium text-white"
+              >Philippines (Asia/Manila)</small
+            >
+          </div>
+        </div>
+      </div>
     </v-main>
 
     <!-- Footer (Desktop only) -->
@@ -259,52 +253,20 @@ onUnmounted(() => {
 .header-bar {
   color: #fff;
 }
-.header-sub {
-  opacity: 0.9;
-  color: rgba(255, 255, 255, 0.9);
-}
 
 /* footer tweaks */
 .footer-bar {
   color: #fff;
 }
-.footer-links a {
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-  font-size: 0.875rem;
-}
 
-/* Footer responsive styles */
-.footer-content {
-  flex-wrap: nowrap;
-  min-height: 52px;
-}
-
-.footer-section .text-caption {
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.contacts {
-  gap: 0.5rem;
-}
-
-.contact-item,
-.divider-item {
-  transition: all 0.3s ease;
-}
-
-.divider-item {
-  opacity: 0.3;
-}
-
-/* Mobile footer inside main */
-.footer-mobile-content {
+/* Mobile full-width footer */
+.footer-mobile-fullwidth {
   width: 100%;
-  margin-left: 0;
-  margin-right: 0;
+  margin: 0;
+  color: white;
 }
 
+/* Mobile footer content */
 .footer-content-mobile {
   color: white;
 }
@@ -313,12 +275,14 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 0.25rem;
 }
 
 .contact-line {
   display: flex;
   align-items: center;
   justify-content: center;
+  line-height: 1.4;
 }
 
 /* small styling for PH time */
@@ -328,22 +292,24 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* Ensure main content has enough space on mobile */
+/* Remove unwanted paddings/margins that cause gaps */
 .v-main {
-  min-height: calc(100vh - 64px) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.v-container {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.v-application .v-main__wrap {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Ensure white text colors */
 .text-white {
   color: white !important;
-}
-
-/* Remove any potential white gaps */
-.v-application .v-main {
-  padding-bottom: 0 !important;
-}
-
-.v-container {
-  padding-bottom: 0 !important;
 }
 </style>
