@@ -325,7 +325,7 @@ onMounted(loadCurrentUser)
             <v-badge
               :content="notificationCount"
               :value="notificationCount > 0"
-              color="success"
+              color="error"
               floating
               overlap
             >
@@ -359,7 +359,7 @@ onMounted(loadCurrentUser)
         <v-badge
           :value="hasNotifications && !mobile && rail"
           :content="notificationCount"
-          color="success"
+          color="error"
           floating
           overlap
         >
