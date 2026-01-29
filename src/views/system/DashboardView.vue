@@ -313,30 +313,7 @@ onMounted(loadCurrentUser)
             <div class="admin-role text-caption opacity-70">Consumer</div>
           </div>
         </div>
-        <v-list-item
-          v-if="hasNotifications"
-          @click="showUpdatedReports"
-          :class="{ 'd-none': !mobile && rail }"
-          class="mb-3 mx-3 rounded"
-          density="compact"
-          active-color="primary"
-        >
-          <template v-slot:prepend>
-            <v-badge
-              :content="notificationCount"
-              :value="notificationCount > 0"
-              color="error"
-              floating
-              overlap
-            >
-              <v-icon color="success" size="24">mdi-bell-ring</v-icon>
-            </v-badge>
-          </template>
-          <v-list-item-title class="font-weight-medium text-success">New Updates</v-list-item-title>
-          <v-list-item-subtitle class="text-caption text-success">
-            {{ notificationCount }} report{{ notificationCount !== 1 ? 's' : '' }} updated
-          </v-list-item-subtitle>
-        </v-list-item>
+
         <v-divider class="my-3 mx-4" :class="{ 'mt-6': !mobile && rail }" />
         <v-list-item
           :active="currentView === 'dashboard'"
@@ -345,6 +322,41 @@ onMounted(loadCurrentUser)
           class="mb-1"
           @click="currentView = 'dashboard'"
         />
+        <!-- Notifications -->
+        <v-list-item
+          @click="showUpdatedReports"
+          class="mb-1"
+          density="compact"
+          active-color="primary"
+        >
+          <template v-slot:prepend>
+            <v-badge
+              v-if="notificationCount > 0"
+              :content="notificationCount"
+              color="error"
+              floating
+              overlap
+              :value="notificationCount"
+            >
+              <v-icon color="white" size="24">mdi-bell-ring</v-icon>
+            </v-badge>
+
+            <v-icon v-else color="white" size="24">mdi-bell-ring</v-icon>
+          </template>
+
+          <v-list-item-title class="font-weight-medium text-white">
+            Notifications
+          </v-list-item-title>
+
+          <v-list-item-subtitle class="text-caption text-white">
+            {{
+              notificationCount > 0
+                ? `${notificationCount} update${notificationCount !== 1 ? 's' : ''}`
+                : 'No new updates'
+            }}
+          </v-list-item-subtitle>
+        </v-list-item>
+
         <v-list-item
           :active="currentView === 'profile'"
           prepend-icon="mdi-account-circle"
@@ -357,16 +369,20 @@ onMounted(loadCurrentUser)
       <!-- Sidebar Edge Lump Toggle -->
       <div class="sidebar-lump" @click="toggleSidebar">
         <v-badge
-          :value="hasNotifications && !mobile && rail"
+          v-if="notificationCount > 0 && mobile && !drawer"
           :content="notificationCount"
           color="error"
           floating
           overlap
         >
           <v-icon size="22">
-            {{ mobile ? 'mdi-chevron-left' : rail ? 'mdi-chevron-right' : 'mdi-chevron-left' }}
+            {{ drawer ? 'mdi-chevron-left' : 'mdi-chevron-right' }}
           </v-icon>
         </v-badge>
+
+        <v-icon v-else size="22">
+          {{ drawer ? 'mdi-chevron-left' : 'mdi-chevron-right' }}
+        </v-icon>
       </div>
     </v-navigation-drawer>
     <v-main class="bg-grey-lighten-4" :class="theme === 'dark' ? 'bg-grey-darken-4' : ''">
@@ -379,152 +395,101 @@ onMounted(loadCurrentUser)
             Report and track water-related issues quickly and easily.
           </p>
         </div>
+        <v-list-item
+          :active="currentView === 'notification'"
+          @click="
+            currentView = 'notification'
+            showUpdatedOnly = true
+          "
+          class="mb-1"
+          density="compact"
+          active-color="primary"
+        >
+          <template v-slot:prepend>
+            <v-badge
+              v-if="notificationCount > 0"
+              :content="notificationCount"
+              color="error"
+              floating
+              overlap
+            >
+              <v-icon color="white" size="24">mdi-bell-ring</v-icon>
+            </v-badge>
+            <v-icon v-else color="white" size="24">mdi-bell-ring</v-icon>
+          </template>
+
+          <v-list-item-title class="font-weight-medium text-white">
+            Notifications
+          </v-list-item-title>
+
+          <v-list-item-subtitle class="text-caption text-white">
+            {{
+              notificationCount > 0
+                ? `${notificationCount} update${notificationCount !== 1 ? 's' : ''}`
+                : 'No new updates'
+            }}
+          </v-list-item-subtitle>
+        </v-list-item>
+
         <div v-if="currentView === 'dashboard'">
+          <!-- dashboard content -->
+        </div>
+
+        <div v-else-if="currentView === 'notification'">
           <v-card rounded="lg" elevation="2" class="position-relative">
             <v-card-title class="d-flex align-center justify-space-between py-4 px-6">
-              <div class="text-h6 font-weight-bold">
-                {{ showUpdatedOnly ? 'Updated Reports' : 'My Reports' }}
-              </div>
+              <div class="text-h6 font-weight-bold">Notifications</div>
               <v-btn
-                v-if="!showUpdatedOnly"
-                color="primary"
-                prepend-icon="mdi-plus"
-                variant="flat"
-                @click="router.push('/report')"
+                variant="outlined"
+                prepend-icon="mdi-arrow-left"
+                @click="currentView = 'dashboard'"
               >
-                New Report
+                Back to Dashboard
               </v-btn>
             </v-card-title>
-            <v-alert
-              v-if="showUpdatedOnly"
-              density="compact"
-              type="success"
-              variant="tonal"
-              class="mx-6 mb-4 rounded-xl"
-              elevation="2"
-            >
-              <div class="d-flex align-center gap-3 flex-wrap">
-                <div>
-                  <v-icon size="28" class="mr-2">mdi-bell-ring</v-icon>
-                  Showing <strong>{{ notificationCount }}</strong> new report update{{
-                    notificationCount !== 1 ? 's' : ''
-                  }}
-                </div>
-                <v-spacer />
-                <v-btn
-                  variant="outlined"
-                  size="large"
-                  prepend-icon="mdi-arrow-left"
-                  @click="resetToAllReports"
-                  class="text-none font-weight-medium px-6"
-                >
-                  Go back to all reports
-                </v-btn>
-              </div>
-            </v-alert>
+
             <v-card-text class="px-6 pb-6">
-              <v-chip-group v-if="!showUpdatedOnly" v-model="currentStatus" mandatory class="mb-6">
-                <v-chip
-                  value="all"
-                  :color="theme === 'light' ? 'primary' : 'blue-darken-2'"
-                  variant="flat"
-                  size="large"
-                >
-                  All <strong class="ml-1">{{ statusCounts.all }}</strong>
-                </v-chip>
-                <v-chip value="pending" color="amber" variant="flat" size="large">
-                  Pending <strong class="ml-1">{{ statusCounts.pending }}</strong>
-                </v-chip>
-                <v-chip value="ongoing" color="blue" variant="flat" size="large">
-                  Ongoing <strong class="ml-1">{{ statusCounts.ongoing }}</strong>
-                </v-chip>
-                <v-chip value="resolved" color="green" variant="flat" size="large">
-                  Resolved <strong class="ml-1">{{ statusCounts.resolved }}</strong>
-                </v-chip>
-                <v-chip value="rejected" color="red" variant="flat" size="large">
-                  Rejected <strong class="ml-1">{{ statusCounts.rejected }}</strong>
-                </v-chip>
-              </v-chip-group>
-              <div v-if="!showUpdatedOnly" class="mb-6">
-                <div class="text-subtitle-1 mb-2">Filter by Type</div>
-                <v-chip-group v-model="selectedType" class="d-flex flex-wrap">
-                  <v-chip value="all" :variant="selectedType === 'all' ? 'flat' : 'outlined'">
-                    All Reports ({{ baseReportsForFiltering.length }})
-                  </v-chip>
-                  <v-chip
-                    v-for="(count, type) in typeCounts"
-                    :key="type"
-                    :value="type"
-                    :prepend-icon="typeIcons[type]"
-                    :color="typeColors[type]"
-                    :variant="selectedType === type ? 'flat' : 'outlined'"
-                  >
-                    {{ type.charAt(0).toUpperCase() + type.slice(1) }} ({{ count }})
-                  </v-chip>
-                </v-chip-group>
-              </div>
-              <v-row>
-                <v-col cols="12">
-                  <v-card
-                    v-for="report in paginatedReports"
-                    :key="report.id"
-                    class="mb-4"
-                    flat
-                    hover
-                  >
-                    <v-list-item three-line @click="openReportDetails(report)">
-                      <template v-slot:prepend>
-                        <v-icon
-                          :color="typeColors[(report.type || 'other').toLowerCase()]"
-                          size="48"
-                          class="mr-4"
-                        >
-                          {{ typeIcons[(report.type || 'other').toLowerCase()] }}
-                        </v-icon>
-                      </template>
-                      <v-list-item-title class="font-weight-medium">
-                        {{ report.type || 'Other' }}
-                      </v-list-item-title>
-                      <v-list-item-subtitle class="mt-1">
-                        <div class="text-caption mt-1">
-                          Reported: {{ new Date(report.created_at).toLocaleDateString('en-PH') }}
-                        </div>
-                      </v-list-item-subtitle>
-                      <template v-slot:append>
-                        <div class="d-flex align-center gap-4">
-                          <v-chip
-                            v-if="updatedReports.has(report.id)"
-                            color="green"
-                            label
-                            size="small"
-                            prepend-icon="mdi-update"
-                            class="mr-2"
-                          >
-                            Status Updated
-                          </v-chip>
-                        </div>
-                      </template>
-                    </v-list-item>
-                    <v-divider />
-                  </v-card>
-                  <div v-if="filteredReports.length === 0" class="text-center py-8">
-                    <v-icon size="64" color="grey-lighten-1">mdi-inbox-outline</v-icon>
-                    <div class="text-h6 mt-4">No reports found</div>
-                    <div class="text-body-2 text-medium-emphasis">Try changing your filters</div>
-                  </div>
-                </v-col>
-              </v-row>
-              <div class="text-center mt-6">
-                <v-pagination
-                  v-model="page"
-                  :length="paginationLength"
-                  :total-visible="7"
-                  density="compact"
-                ></v-pagination>
+              <v-card
+                v-for="report in reports.filter((r) => updatedReports.has(r.id))"
+                :key="report.id"
+                class="mb-4"
+                flat
+                hover
+                @click="openReportDetails(report)"
+              >
+                <v-list-item three-line>
+                  <template v-slot:prepend>
+                    <v-icon
+                      :color="typeColors[(report.type || 'other').toLowerCase()]"
+                      size="48"
+                      class="mr-4"
+                    >
+                      {{ typeIcons[(report.type || 'other').toLowerCase()] }}
+                    </v-icon>
+                  </template>
+
+                  <v-list-item-title class="font-weight-medium">
+                    {{ report.type || 'Other' }}
+                  </v-list-item-title>
+
+                  <v-list-item-subtitle class="mt-1">
+                    Reported: {{ new Date(report.created_at).toLocaleDateString('en-PH') }}
+                  </v-list-item-subtitle>
+                </v-list-item>
+                <v-divider />
+              </v-card>
+              <div v-if="updatedReports.size === 0" class="text-center py-8">
+                <v-icon size="64" color="grey-lighten-1">mdi-bell-off</v-icon>
+                <div class="text-h6 mt-4">No notifications</div>
               </div>
             </v-card-text>
           </v-card>
         </div>
+
+        <div v-else-if="currentView === 'profile'">
+          <!-- profile content -->
+        </div>
+
         <div v-else>
           <v-card
             class="pa-3 pa-sm-5 text-center modern-card mx-auto"
