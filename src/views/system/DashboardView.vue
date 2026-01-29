@@ -7,40 +7,19 @@ import { supabase } from '@/utils/supabase.js'
 import AlertNotification from '@/components/common/AlertNotification.vue'
 const { mobile } = useDisplay()
 const router = useRouter()
-// Vuetify theme helper
 const vuetifyTheme = useTheme()
-// Persistent theme (read from localStorage)
 const theme = ref(localStorage.getItem('theme') ?? 'light')
-// Apply initial theme to Vuetify
 vuetifyTheme.change(theme.value)
-// toggle theme (and persist)
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', theme.value)
   vuetifyTheme.change(theme.value)
 }
-// keep Vuetify in sync if theme is changed elsewhere
-watch(theme, (val) => {
-  vuetifyTheme.change(val)
-})
-// Logout function
+watch(theme, (val) => vuetifyTheme.change(val))
 async function logout() {
   await supabase.auth.signOut()
   router.push('/login')
 }
-// Dashboard cards (report icon color changed to red)
-const cards = [
-  { title: 'Report a Leak', icon: 'mdi-water-alert', color: 'red', route: '/report' },
-  {
-    title: 'My Reports',
-    icon: 'mdi-format-list-bulleted',
-    color: 'green',
-    route: '/my-reports',
-    notify: true,
-  },
-  { title: 'Profile', icon: 'mdi-account-circle', color: 'deep-purple', route: '/profile' },
-]
-// -------- Philippine live date/time ----------
 const phTime = ref('')
 let timer = null
 function updatePhTime() {
@@ -64,10 +43,24 @@ onMounted(() => {
 onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
-// 🔔 REPORT STATUS INDICATOR
 const updatedReports = ref(new Set())
 const lastViewedUpdates = ref(JSON.parse(localStorage.getItem('lastViewedUpdates') || '{}'))
-// Fetch reports
+const notificationCount = computed(() => updatedReports.value.size)
+const hasNotifications = computed(() => notificationCount.value > 0)
+const showUpdatedOnly = ref(false)
+function showUpdatedReports() {
+  currentView.value = 'dashboard'
+  showUpdatedOnly.value = true
+  currentStatus.value = 'all'
+  selectedType.value = 'all'
+  page.value = 1
+}
+function resetToAllReports() {
+  showUpdatedOnly.value = false
+  currentStatus.value = 'all'
+  selectedType.value = 'all'
+  page.value = 1
+}
 const reports = ref([])
 async function fetchReports() {
   const { data: userData } = await supabase.auth.getUser()
@@ -79,29 +72,35 @@ async function fetchReports() {
     .order('created_at', { ascending: false })
   reports.value = data || []
 }
-// Status counts
+const baseReportsForFiltering = computed(() => {
+  if (!showUpdatedOnly.value) return reports.value
+  return reports.value.filter((r) => updatedReports.value.has(r.id))
+})
 const statusCounts = computed(() => {
-  const counts = { all: reports.value.length, pending: 0, ongoing: 0, resolved: 0, rejected: 0 }
-  reports.value.forEach((r) => {
+  const counts = {
+    all: baseReportsForFiltering.value.length,
+    pending: 0,
+    ongoing: 0,
+    resolved: 0,
+    rejected: 0,
+  }
+  baseReportsForFiltering.value.forEach((r) => {
     if (r.status in counts) counts[r.status]++
   })
   return counts
 })
-// Type counts
 const typeCounts = computed(() => {
   const counts = {}
-  reports.value.forEach((r) => {
+  baseReportsForFiltering.value.forEach((r) => {
     const t = (r.type || 'other').toLowerCase()
     counts[t] = (counts[t] || 0) + 1
   })
   return counts
 })
-// Filters
 const currentStatus = ref('all')
 const selectedType = ref('all')
-// Filtered reports
 const filteredReports = computed(() => {
-  let filtered = reports.value
+  let filtered = baseReportsForFiltering.value
   if (currentStatus.value !== 'all') {
     filtered = filtered.filter((r) => r.status === currentStatus.value)
   }
@@ -110,7 +109,6 @@ const filteredReports = computed(() => {
   }
   return filtered
 })
-// Pagination
 const page = ref(1)
 const itemsPerPage = 10
 const paginatedReports = computed(() => {
@@ -118,7 +116,6 @@ const paginatedReports = computed(() => {
   return filteredReports.value.slice(start, start + itemsPerPage)
 })
 const paginationLength = computed(() => Math.ceil(filteredReports.value.length / itemsPerPage))
-// Type maps
 const typeIcons = {
   'low pressure': 'mdi-water',
   'broken pipe': 'mdi-pipe-leak',
@@ -141,7 +138,6 @@ const statusColors = {
   resolved: 'green',
   rejected: 'red',
 }
-// User name for profile
 const userName = ref('')
 async function fetchUser() {
   const { data } = await supabase.auth.getUser()
@@ -151,7 +147,6 @@ async function fetchUser() {
     data?.user?.email?.split('@')[0] ||
     'User'
 }
-// Report details dialog
 const dialog = ref(false)
 const selectedReport = ref(null)
 function openReportDetails(report) {
@@ -161,7 +156,6 @@ function openReportDetails(report) {
   localStorage.setItem('lastViewedUpdates', JSON.stringify(lastViewedUpdates.value))
   updatedReports.value.delete(report.id)
 }
-// Image zoom dialog
 const showImageViewer = ref(false)
 const activeImage = ref('')
 const zoomLevel = ref(1)
@@ -179,11 +173,8 @@ function zoomOut() {
 function resetZoom() {
   zoomLevel.value = 1
 }
-// Drawer control
 const drawer = ref(!mobile.value)
 const rail = ref(false)
-
-// Unified toggle for hamburger button
 function toggleSidebar() {
   if (mobile.value) {
     drawer.value = !drawer.value
@@ -191,21 +182,18 @@ function toggleSidebar() {
     rail.value = !rail.value
   }
 }
-
 watch(mobile, (isMobile) => {
   if (isMobile) {
-    drawer.value = false // close on mobile resize
+    drawer.value = false
     rail.value = false
   } else {
-    drawer.value = true // open on desktop
+    drawer.value = true
     rail.value = false
   }
 })
-// Load data function
 async function loadData() {
   await fetchReports()
   await fetchUser()
-  // Compute updated reports after fetching
   const updated = reports.value.filter((r) => {
     const lastViewed = lastViewedUpdates.value[r.id]
     const updatedDate = new Date(r.updated_at)
@@ -214,10 +202,8 @@ async function loadData() {
   })
   updatedReports.value = new Set(updated.map((r) => r.id))
 }
-// On mounted and activated
 onMounted(loadData)
 onActivated(loadData)
-// Profile logic
 const loading = ref(false)
 const saving = ref(false)
 const editing = ref(false)
@@ -281,37 +267,31 @@ onMounted(loadCurrentUser)
 </script>
 <template>
   <v-app :theme="theme">
-    <!-- Header -->
     <v-app-bar
       flat
       density="comfortable"
       :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      class="px-3 px-sm-6"
+      class="px-2 px-sm-6"
     >
-      <v-btn icon @click="toggleSidebar">
-        <v-icon>mdi-menu</v-icon>
-      </v-btn>
-      <v-toolbar-title class="font-weight-bold">BCWD Complaint System</v-toolbar-title>
+      <v-toolbar-title class="font-weight-bold toolbar-title"
+        >BCWD Complaint System</v-toolbar-title
+      >
       <v-spacer />
       <div class="d-flex align-center gap-2">
-        <!-- Live PH time - Hidden on small mobile -->
         <div
           class="text-caption text-white font-weight-medium ph-time"
           :class="{ 'd-none d-sm-block': mobile }"
         >
           {{ phTime }}
         </div>
-        <!-- Theme toggle -->
         <v-btn icon variant="text" @click="toggleTheme">
           <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
         </v-btn>
-        <!-- Logout -->
         <v-btn icon variant="text" @click="logout">
           <v-icon>mdi-logout</v-icon>
         </v-btn>
       </div>
     </v-app-bar>
-    <!-- DRAWER / SIDEBAR -->
     <v-navigation-drawer
       v-model="drawer"
       :temporary="mobile"
@@ -321,7 +301,6 @@ onMounted(loadCurrentUser)
       dark
     >
       <v-list nav density="compact">
-        <!-- Profile - hidden completely in rail mode -->
         <div
           class="sidebar-profile pa-5 d-flex flex-column align-center"
           :class="{ 'd-none': !mobile && rail }"
@@ -329,17 +308,36 @@ onMounted(loadCurrentUser)
           <v-avatar size="80" class="mb-4 elevation-6 profile-avatar" color="grey-lighten-4">
             <v-icon size="48" color="primary">mdi-account-circle</v-icon>
           </v-avatar>
-
           <div class="admin-info text-center">
-            <div class="admin-name text-h6 font-weight-medium mb-1">
-              {{ userName }}
-            </div>
+            <div class="admin-name text-h6 font-weight-medium mb-1">{{ userName }}</div>
             <div class="admin-role text-caption opacity-70">Consumer</div>
           </div>
         </div>
-
+        <v-list-item
+          v-if="hasNotifications"
+          @click="showUpdatedReports"
+          :class="{ 'd-none': !mobile && rail }"
+          class="mb-3 mx-3 rounded"
+          density="compact"
+          active-color="primary"
+        >
+          <template v-slot:prepend>
+            <v-badge
+              :content="notificationCount"
+              :value="notificationCount > 0"
+              color="success"
+              floating
+              overlap
+            >
+              <v-icon color="success" size="24">mdi-bell-ring</v-icon>
+            </v-badge>
+          </template>
+          <v-list-item-title class="font-weight-medium text-success">New Updates</v-list-item-title>
+          <v-list-item-subtitle class="text-caption text-success">
+            {{ notificationCount }} report{{ notificationCount !== 1 ? 's' : '' }} updated
+          </v-list-item-subtitle>
+        </v-list-item>
         <v-divider class="my-3 mx-4" :class="{ 'mt-6': !mobile && rail }" />
-
         <v-list-item
           :active="currentView === 'dashboard'"
           prepend-icon="mdi-view-dashboard"
@@ -356,24 +354,39 @@ onMounted(loadCurrentUser)
         />
         <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout" class="mt-8" />
       </v-list>
+      <!-- Sidebar Edge Lump Toggle -->
+      <div class="sidebar-lump" @click="toggleSidebar">
+        <v-badge
+          :value="hasNotifications && !mobile && rail"
+          :content="notificationCount"
+          color="success"
+          floating
+          overlap
+        >
+          <v-icon size="22">
+            {{ mobile ? 'mdi-chevron-left' : rail ? 'mdi-chevron-right' : 'mdi-chevron-left' }}
+          </v-icon>
+        </v-badge>
+      </div>
     </v-navigation-drawer>
-    <!-- Main -->
     <v-main class="bg-grey-lighten-4" :class="theme === 'dark' ? 'bg-grey-darken-4' : ''">
       <v-container fluid class="pa-4 pa-md-6">
-        <!-- Welcome Section -->
-        <div class="text-center mb-8">
-          <h2 class="text-h4 font-weight-bold mb-2">Welcome to BCWD Complaint System</h2>
-          <p class="text-body-1 text-medium-emphasis">
+        <div class="text-center mb-6 mb-md-8">
+          <h2 class="font-weight-bold mb-2" :class="mobile ? 'text-h6' : 'text-h4'">
+            Welcome to BCWD Complaint System
+          </h2>
+          <p class="text-medium-emphasis" :class="mobile ? 'text-caption' : 'text-body-1'">
             Report and track water-related issues quickly and easily.
           </p>
         </div>
-        <!-- Dynamic Content -->
         <div v-if="currentView === 'dashboard'">
-          <!-- MY REPORTS SECTION -->
           <v-card rounded="lg" elevation="2" class="position-relative">
             <v-card-title class="d-flex align-center justify-space-between py-4 px-6">
-              <div class="text-h6 font-weight-bold">My Reports</div>
+              <div class="text-h6 font-weight-bold">
+                {{ showUpdatedOnly ? 'Updated Reports' : 'My Reports' }}
+              </div>
               <v-btn
+                v-if="!showUpdatedOnly"
                 color="primary"
                 prepend-icon="mdi-plus"
                 variant="flat"
@@ -382,9 +395,35 @@ onMounted(loadCurrentUser)
                 New Report
               </v-btn>
             </v-card-title>
+            <v-alert
+              v-if="showUpdatedOnly"
+              density="compact"
+              type="success"
+              variant="tonal"
+              class="mx-6 mb-4 rounded-xl"
+              elevation="2"
+            >
+              <div class="d-flex align-center gap-3 flex-wrap">
+                <div>
+                  <v-icon size="28" class="mr-2">mdi-bell-ring</v-icon>
+                  Showing <strong>{{ notificationCount }}</strong> new report update{{
+                    notificationCount !== 1 ? 's' : ''
+                  }}
+                </div>
+                <v-spacer />
+                <v-btn
+                  variant="outlined"
+                  size="large"
+                  prepend-icon="mdi-arrow-left"
+                  @click="resetToAllReports"
+                  class="text-none font-weight-medium px-6"
+                >
+                  Go back to all reports
+                </v-btn>
+              </div>
+            </v-alert>
             <v-card-text class="px-6 pb-6">
-              <!-- Status Tabs -->
-              <v-chip-group v-model="currentStatus" mandatory class="mb-6">
+              <v-chip-group v-if="!showUpdatedOnly" v-model="currentStatus" mandatory class="mb-6">
                 <v-chip
                   value="all"
                   :color="theme === 'light' ? 'primary' : 'blue-darken-2'"
@@ -406,13 +445,12 @@ onMounted(loadCurrentUser)
                   Rejected <strong class="ml-1">{{ statusCounts.rejected }}</strong>
                 </v-chip>
               </v-chip-group>
-              <!-- Filter by Type -->
-              <div class="mb-6">
+              <div v-if="!showUpdatedOnly" class="mb-6">
                 <div class="text-subtitle-1 mb-2">Filter by Type</div>
                 <v-chip-group v-model="selectedType" class="d-flex flex-wrap">
-                  <v-chip value="all" :variant="selectedType === 'all' ? 'flat' : 'outlined'"
-                    >All Reports ({{ reports.length }})</v-chip
-                  >
+                  <v-chip value="all" :variant="selectedType === 'all' ? 'flat' : 'outlined'">
+                    All Reports ({{ baseReportsForFiltering.length }})
+                  </v-chip>
                   <v-chip
                     v-for="(count, type) in typeCounts"
                     :key="type"
@@ -425,7 +463,6 @@ onMounted(loadCurrentUser)
                   </v-chip>
                 </v-chip-group>
               </div>
-              <!-- Report Items -->
               <v-row>
                 <v-col cols="12">
                   <v-card
@@ -470,9 +507,13 @@ onMounted(loadCurrentUser)
                     </v-list-item>
                     <v-divider />
                   </v-card>
+                  <div v-if="filteredReports.length === 0" class="text-center py-8">
+                    <v-icon size="64" color="grey-lighten-1">mdi-inbox-outline</v-icon>
+                    <div class="text-h6 mt-4">No reports found</div>
+                    <div class="text-body-2 text-medium-emphasis">Try changing your filters</div>
+                  </div>
                 </v-col>
               </v-row>
-              <!-- Pagination -->
               <div class="text-center mt-6">
                 <v-pagination
                   v-model="page"
@@ -492,7 +533,6 @@ onMounted(loadCurrentUser)
             rounded="xl"
             max-width="700"
           >
-            <!-- Avatar -->
             <v-avatar size="90" class="mb-4">
               <v-icon size="90" color="primary">mdi-account-circle</v-icon>
             </v-avatar>
@@ -504,9 +544,7 @@ onMounted(loadCurrentUser)
               :form-success-message="formSuccessMessage"
               :form-error-message="formErrorMessage"
             />
-            <!-- Loader -->
             <v-skeleton-loader v-if="loading" type="heading, paragraph, paragraph" class="mb-4" />
-            <!-- Profile Fields -->
             <div v-else>
               <v-text-field
                 v-model="email"
@@ -549,7 +587,6 @@ onMounted(loadCurrentUser)
                 class="mb-4"
                 :readonly="!editing"
               />
-              <!-- ✅ Fixed Responsive Buttons -->
               <div class="button-group d-flex flex-wrap justify-center align-center mt-6">
                 <v-btn
                   v-if="!editing"
@@ -558,8 +595,7 @@ onMounted(loadCurrentUser)
                   class="flex-btn"
                   @click="editing = true"
                 >
-                  <v-icon start>mdi-account-edit</v-icon>
-                  Edit Profile
+                  <v-icon start>mdi-account-edit</v-icon> Edit Profile
                 </v-btn>
                 <v-btn
                   v-else
@@ -569,8 +605,7 @@ onMounted(loadCurrentUser)
                   :loading="saving"
                   @click="saveProfile"
                 >
-                  <v-icon start>mdi-content-save</v-icon>
-                  Save Changes
+                  <v-icon start>mdi-content-save</v-icon> Save Changes
                 </v-btn>
                 <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'">
                   <v-icon start>mdi-arrow-left</v-icon> Back
@@ -582,8 +617,7 @@ onMounted(loadCurrentUser)
                   class="flex-btn"
                   @click="logout"
                 >
-                  <v-icon start>mdi-logout</v-icon>
-                  Logout
+                  <v-icon start>mdi-logout</v-icon> Logout
                 </v-btn>
               </div>
             </div>
@@ -663,7 +697,7 @@ onMounted(loadCurrentUser)
           </v-card-actions>
         </v-card>
       </v-dialog>
-      <!-- Footer Content Inside Main (for mobile) - Outside container -->
+      <!-- Mobile Footer -->
       <v-row v-if="mobile" class="mt-8 mx-0">
         <v-col cols="12" class="px-0">
           <div
@@ -706,7 +740,6 @@ onMounted(loadCurrentUser)
         </v-col>
       </v-row>
     </v-main>
-    <!-- Footer (Desktop only) -->
     <v-footer
       v-if="!mobile"
       app
@@ -716,41 +749,34 @@ onMounted(loadCurrentUser)
     >
       <v-container class="pa-0">
         <v-row no-gutters align="center" class="footer-content px-2 px-sm-4 justify-space-between">
-          <!-- Copyright - Left -->
           <div class="footer-section copyright d-flex align-center">
             <span class="text-caption font-weight-medium text-white"
               >&copy; 2025 BCWD Complaint System</span
             >
           </div>
-          <!-- Contact Info - Center -->
           <div
             class="footer-section contacts d-flex align-center justify-center flex-nowrap flex-grow-1 mx-4"
           >
-            <!-- Address -->
             <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
               <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
               <span class="text-caption text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
             </div>
             <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
-            <!-- Phone -->
             <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
               <v-icon size="12" class="mr-1 text-white">mdi-phone</v-icon>
               <span class="text-caption text-white">(085) 817-6635</span>
             </div>
             <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
-            <!-- Mobile -->
             <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
               <v-icon size="12" class="mr-1 text-white">mdi-cellphone</v-icon>
               <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
             </div>
             <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
-            <!-- Email -->
             <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
               <v-icon size="12" class="mr-1 text-white">mdi-email</v-icon>
               <span class="text-caption text-white">bcwdrecords@gmail.com</span>
             </div>
           </div>
-          <!-- Time Zone - Right -->
           <div class="footer-section timezone d-flex align-center">
             <small class="text-caption font-weight-medium text-white"
               >Philippines (Asia/Manila)</small
@@ -771,14 +797,12 @@ onMounted(loadCurrentUser)
 .v-list-item--active {
   background-color: rgba(255, 255, 255, 0.12) !important;
 }
-/* Footer background colors */
 .bg-footer-light {
   background-color: #1565c0;
 }
 .bg-footer-dark {
   background-color: #0f1720;
 }
-/* Additional styles from Code 1 if needed */
 .text-white {
   color: white !important;
 }
@@ -800,125 +824,36 @@ onMounted(loadCurrentUser)
   max-height: 70vh;
   transition: transform 0.2s ease;
 }
-
 .cursor-pointer {
   cursor: pointer;
 }
-
-/* ── Sidebar Profile ─────────────────────────────── */
 .sidebar-profile {
   padding: 28px 16px 20px !important;
   transition: all 0.3s ease;
 }
-
 .profile-avatar {
   border: 3px solid rgba(255, 255, 255, 0.2);
   background-color: white !important;
   transition: all 0.25s ease;
 }
-
 .profile-avatar:hover {
   transform: scale(1.06);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
 }
-
 .admin-info {
   line-height: 1.3;
 }
-
 .admin-name {
   color: rgba(255, 255, 255, 0.96);
   letter-spacing: 0.3px;
 }
-
 .admin-role {
   color: rgba(255, 255, 255, 0.62);
   margin-top: 3px;
 }
-
-/* When rail → completely hide profile */
 .v-navigation-drawer--rail .sidebar-profile {
   display: none !important;
 }
-.text-blue {
-  color: #1976d2;
-}
-.text-black {
-  color: #000000;
-}
-.bg-grey-lighten-5 {
-  background-color: #f5f5f5;
-}
-.bg-grey-darken-4 {
-  background-color: #121212;
-}
-/* Footer background colors */
-.bg-footer-light {
-  background-color: #0f5088;
-}
-.bg-footer-dark {
-  background-color: #0b1116;
-}
-/* header tweaks */
-.header-bar {
-  color: #fff;
-}
-.header-sub {
-  opacity: 0.9;
-  color: rgba(255, 255, 255, 0.9);
-}
-/* footer tweaks */
-.footer-bar {
-  color: #fff;
-}
-.footer-links a {
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-  font-size: 0.875rem;
-}
-/* Footer responsive styles */
-.footer-content {
-  flex-wrap: nowrap;
-  min-height: 52px;
-}
-.footer-section .text-caption {
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-.contacts {
-  gap: 0.5rem;
-}
-.contact-item,
-.divider-item {
-  transition: all 0.3s ease;
-}
-.divider-item {
-  opacity: 0.3;
-}
-/* Mobile footer inside main */
-.footer-mobile-content {
-  width: 100%;
-}
-.footer-content-mobile {
-  color: white;
-}
-.footer-contacts-mobile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.contact-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-/* small styling for PH time */
-.ph-time {
-  color: rgba(255, 255, 255, 0.95);
-  font-weight: 500;
-  white-space: nowrap;
-}
-/* Card styling */
 .modern-card {
   transition: all 0.3s ease;
 }
@@ -926,13 +861,12 @@ onMounted(loadCurrentUser)
   transform: translateY(-5px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
-/* ✅ Fix buttons to be fluid and wrap nicely */
 .button-group {
   gap: 12px;
   width: 100%;
 }
 .flex-btn {
-  flex: 1 1 200px; /* grows, shrinks, min width 200px */
+  flex: 1 1 200px;
   max-width: 240px;
   justify-content: center;
 }
@@ -941,22 +875,26 @@ onMounted(loadCurrentUser)
     flex: 1 1 100%;
     max-width: 100%;
   }
+  .toolbar-title {
+    font-size: 1rem !important;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.2;
+    max-width: 50vw;
+  }
+  .v-app-bar {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
 }
-/* Ensure main content has enough space on mobile */
 .v-main {
   min-height: calc(100vh - 64px) !important;
+  overflow-y: auto !important;
 }
-/* Ensure white text colors */
-.text-white {
-  color: white !important;
-}
-/* Remove any potential white gaps */
-.v-container {
-  padding-bottom: 0 !important;
-}
-/* Add this to your style section */
 .v-container {
   max-width: 100% !important;
+  padding-bottom: 0 !important;
 }
 @media (min-width: 600px) {
   .v-container {
@@ -964,7 +902,42 @@ onMounted(loadCurrentUser)
     padding-right: 24px !important;
   }
 }
-.v-main {
-  overflow-y: auto !important;
+/* Sidebar Edge Lump – color matched to sidebar */
+.sidebar-lump {
+  position: absolute;
+  top: 50%;
+  right: -32px; /* outside the drawer */
+  transform: translateY(-50%);
+  width: 32px;
+  height: 72px;
+  border-radius: 0 36px 36px 0;
+  background-color: #1565c0; /* sidebar blue */
+  color: #ffffff; /* white chevron */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 50;
+  box-shadow: 3px 0 12px rgba(0, 0, 0, 0.35);
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+/* Dark theme – match dark sidebar */
+.v-theme--dark .sidebar-lump {
+  background-color: #0f1720;
+  color: #ffffff;
+}
+/* Hover feedback */
+.sidebar-lump:hover {
+  background-color: #1976d2; /* slightly lighter blue */
+  transform: translateY(-50%) scale(1.08);
+}
+.v-theme--dark .sidebar-lump:hover {
+  background-color: #1e293b;
+}
+/* Rail mode */
+.v-navigation-drawer--rail .sidebar-lump {
+  right: -32px;
 }
 </style>
