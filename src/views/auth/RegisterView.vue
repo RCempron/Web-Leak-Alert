@@ -48,37 +48,35 @@ onUnmounted(() => {
 
 <template>
   <v-app>
-    <!-- Header -->
-    <v-app-bar flat density="comfortable" class="glass-header" :class="theme">
-      <div class="d-flex align-center gap-3">
-        <v-img src="/images/LeakAlertLogo.png" width="36" contain />
+    <!-- Glass Header -->
+    <v-app-bar flat class="glass-header" :class="theme">
+      <v-container class="d-flex align-center" fluid>
         <div class="title">BCWD Complaint System</div>
-      </div>
 
-      <v-spacer />
+        <v-spacer />
 
-      <div class="ph-time d-none d-sm-flex">{{ phTime }}</div>
+        <div class="ph-time d-none d-sm-flex">{{ phTime }}</div>
 
-      <v-btn icon variant="text" @click="toggleTheme">
-        <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
-      </v-btn>
+        <v-btn icon variant="text" @click="toggleTheme">
+          <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
+        </v-btn>
+      </v-container>
     </v-app-bar>
 
+    <!-- Main -->
     <v-main class="auth-bg" :class="theme">
       <div class="auth-wrapper">
-        <!-- MEGA CARD -->
         <v-card class="mega-auth-card" elevation="16" rounded="xl">
           <div class="mega-grid">
-            <!-- LEFT SIDE (WELCOME) -->
+            <!-- LEFT SIDE (SAME AS LOGIN) -->
             <div class="mega-left">
-              <div class="mega-overlay"></div>
               <div class="mega-content">
-                <v-img src="/images/LeakAlertLogo.png" width="110" class="mb-4" />
-                <h1>Join BCWD</h1>
-                <p class="subtitle">Create your account</p>
+                <v-img src="/images/logo.png" width="110" class="mb-4" />
+                <h1>Create Account</h1>
+                <p class="subtitle">Join BCWD Complaint System</p>
                 <p class="desc">
-                  Register to report leaks, track complaints, and access real-time updates and
-                  services from BCWD.
+                  Register to report leaks, track complaints, and receive real-time updates on water
+                  services and system notifications.
                 </p>
 
                 <div class="mega-stats">
@@ -88,17 +86,17 @@ onUnmounted(() => {
                   </div>
                   <div class="stat">
                     <strong>Secure</strong>
-                    <span>User Data</span>
+                    <span>Data Privacy</span>
                   </div>
                   <div class="stat">
-                    <strong>Verified</strong>
-                    <span>Reports</span>
+                    <strong>Reliable</strong>
+                    <span>System Access</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- RIGHT SIDE (FORM) -->
+            <!-- RIGHT SIDE -->
             <div class="mega-right">
               <div class="login-header">
                 <h2>Create Account</h2>
@@ -121,28 +119,27 @@ onUnmounted(() => {
           </div>
         </v-card>
       </div>
-
-      <!-- Footer -->
-      <v-footer class="auth-footer" :class="theme">
-        <div class="footer-inner">
-          <div class="left">© 2025 BCWD Complaint System</div>
-          <div class="center d-none d-md-flex">
-            <span
-              ><v-icon size="14">mdi-map-marker</v-icon> Gov. Jose A. Rosales Ave., Butuan
-              City</span
-            >
-            <span><v-icon size="14">mdi-phone</v-icon> (085) 817-6635</span>
-            <span><v-icon size="14">mdi-email</v-icon> bcwdrecords@gmail.com</span>
-          </div>
-          <div class="right">Philippines (Asia/Manila)</div>
-        </div>
-      </v-footer>
     </v-main>
+
+    <!-- Footer -->
+    <v-footer app class="auth-footer" :class="theme">
+      <div class="footer-inner">
+        <div class="left">© 2025 BCWD Complaint System</div>
+        <div class="center d-none d-md-flex">
+          <span
+            ><v-icon size="14">mdi-map-marker</v-icon> Gov. Jose A. Rosales Ave., Butuan City</span
+          >
+          <span><v-icon size="14">mdi-phone</v-icon> (085) 817-6635</span>
+          <span><v-icon size="14">mdi-email</v-icon> bcwdrecords@gmail.com</span>
+        </div>
+        <div class="right">Philippines (Asia/Manila)</div>
+      </div>
+    </v-footer>
   </v-app>
 </template>
 
 <style scoped>
-/* BACKGROUND */
+/* THEME BACKGROUND */
 .auth-bg.light {
   background: linear-gradient(135deg, #e3f2fd, #f5f9ff);
 }
@@ -150,7 +147,7 @@ onUnmounted(() => {
   background: radial-gradient(circle at top, #0f1720, #05080d);
 }
 
-/* HEADER COLORS */
+/* HEADER */
 .glass-header {
   backdrop-filter: blur(12px);
   background: #1565c0;
@@ -159,12 +156,10 @@ onUnmounted(() => {
 .glass-header.dark {
   background: #0f1720;
 }
-
 .title {
   font-weight: 700;
   letter-spacing: 0.5px;
 }
-
 .ph-time {
   font-size: 0.75rem;
   opacity: 0.9;
@@ -173,7 +168,7 @@ onUnmounted(() => {
 
 /* WRAPPER */
 .auth-wrapper {
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 64px - 40px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -182,7 +177,7 @@ onUnmounted(() => {
 
 /* MEGA CARD */
 .mega-auth-card {
-  width: 50%;
+  width: 60%;
   max-width: 1200px;
   overflow: hidden;
 }
@@ -197,51 +192,59 @@ onUnmounted(() => {
   }
 }
 
-/* LEFT */
+/* LEFT SIDE - SAME SYSTEM AS LOGIN */
 .mega-left {
   position: relative;
-  background: linear-gradient(135deg, #1565c0, #0f5088);
-  color: white;
   padding: 48px;
   display: flex;
   align-items: center;
-}
-.mega-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(21, 101, 192, 0.9), rgba(15, 80, 136, 0.9));
-}
-.mega-content {
-  position: relative;
-  z-index: 2;
-  max-width: 480px;
-}
-.mega-content h1 {
-  font-size: 2.4rem;
-  font-weight: 800;
-  margin-bottom: 6px;
-}
-.subtitle {
-  font-weight: 600;
-  opacity: 0.95;
-}
-.desc {
-  margin-top: 12px;
-  opacity: 0.9;
-  line-height: 1.5;
+  background: #e9f0f5;
+  color: #0f5088;
+  transition: 0.3s ease;
 }
 
+/* Dark mode */
+.dark .mega-left {
+  background: #0f1720;
+  color: #e3f2fd;
+}
+
+.mega-content {
+  max-width: 480px;
+}
+
+/* TEXT COLORS */
+.mega-content h1 {
+  color: #0d47a1;
+}
+.subtitle {
+  color: #1565c0;
+}
+.desc {
+  color: #455a64;
+}
+
+/* Dark text */
+.dark .mega-content h1 {
+  color: #e3f2fd;
+}
+.dark .subtitle {
+  color: #90caf9;
+}
+.dark .desc {
+  color: #b0bec5;
+}
+
+/* STATS */
 .mega-stats {
   display: flex;
   gap: 16px;
   margin-top: 32px;
 }
 .stat {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(6px);
-  padding: 14px 18px;
-  border-radius: 14px;
-  text-align: center;
+  background: transparent;
+  border: none;
+  color: inherit;
 }
 .stat strong {
   display: block;
@@ -252,13 +255,14 @@ onUnmounted(() => {
   opacity: 0.9;
 }
 
-/* RIGHT */
+/* RIGHT SIDE */
 .mega-right {
   padding: 48px 40px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
+
 .login-header {
   text-align: center;
   margin-bottom: 24px;

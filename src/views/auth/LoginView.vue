@@ -50,18 +50,17 @@ onUnmounted(() => {
   <v-app>
     <!-- Glass Header -->
     <v-app-bar flat class="glass-header" :class="theme">
-      <div class="d-flex align-center gap-3">
-        <v-img src="/images/LeakAlertLogo.png" width="36" contain />
+      <v-container class="d-flex align-center" fluid>
         <div class="title">BCWD Complaint System</div>
-      </div>
 
-      <v-spacer />
+        <v-spacer />
 
-      <div class="ph-time d-none d-sm-flex">{{ phTime }}</div>
+        <div class="ph-time d-none d-sm-flex">{{ phTime }}</div>
 
-      <v-btn icon variant="text" @click="toggleTheme">
-        <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
-      </v-btn>
+        <v-btn icon variant="text" @click="toggleTheme">
+          <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
+        </v-btn>
+      </v-container>
     </v-app-bar>
 
     <!-- Main -->
@@ -71,9 +70,11 @@ onUnmounted(() => {
           <div class="mega-grid">
             <!-- Welcome + Branding Side -->
             <div class="mega-left">
+              <v-img src="/images/logo.png" class="mega-logo" />
+
               <div class="mega-overlay"></div>
+
               <div class="mega-content">
-                <v-img src="/images/LeakAlertLogo.png" width="110" class="mb-4" />
                 <h1>Welcome Back</h1>
                 <p class="subtitle">BCWD Complaint System</p>
                 <p class="desc">
@@ -121,23 +122,22 @@ onUnmounted(() => {
           </div>
         </v-card>
       </div>
-
-      <!-- Footer -->
-      <v-footer class="auth-footer" :class="theme">
-        <div class="footer-inner">
-          <div class="left">© 2025 BCWD Complaint System</div>
-          <div class="center d-none d-md-flex">
-            <span
-              ><v-icon size="14">mdi-map-marker</v-icon> Gov. Jose A. Rosales Ave., Butuan
-              City</span
-            >
-            <span><v-icon size="14">mdi-phone</v-icon> (085) 817-6635</span>
-            <span><v-icon size="14">mdi-email</v-icon> bcwdrecords@gmail.com</span>
-          </div>
-          <div class="right">Philippines (Asia/Manila)</div>
-        </div>
-      </v-footer>
     </v-main>
+
+    <!-- Footer (OUTSIDE v-main) -->
+    <v-footer app class="auth-footer" :class="theme">
+      <div class="footer-inner">
+        <div class="left">© 2025 BCWD Complaint System</div>
+        <div class="center d-none d-md-flex">
+          <span
+            ><v-icon size="14">mdi-map-marker</v-icon> Gov. Jose A. Rosales Ave., Butuan City</span
+          >
+          <span><v-icon size="14">mdi-phone</v-icon> (085) 817-6635</span>
+          <span><v-icon size="14">mdi-email</v-icon> bcwdrecords@gmail.com</span>
+        </div>
+        <div class="right">Philippines (Asia/Manila)</div>
+      </div>
+    </v-footer>
   </v-app>
 </template>
 
@@ -172,7 +172,7 @@ onUnmounted(() => {
 
 /* WRAPPER */
 .auth-wrapper {
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 64px - 40px); /* header + footer */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -334,43 +334,60 @@ onUnmounted(() => {
   }
 }
 
-/* LEFT SIDE */
+/* LEFT SIDE - THEME AWARE */
 .mega-left {
   position: relative;
-  background: linear-gradient(135deg, #1565c0, #0f5088);
-  color: white;
   padding: 48px;
   display: flex;
   align-items: center;
+  background: #e9f0f5; /* light mode */
+  color: #0f5088;
+  transition:
+    background 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Dark mode left side */
+.dark .mega-left {
+  background: #0f1720; /* same family as right side */
+  color: #e3f2fd;
 }
 
 .mega-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(21, 101, 192, 0.9), rgba(15, 80, 136, 0.9));
+  display: none;
 }
 
 .mega-content {
   position: relative;
   z-index: 2;
   max-width: 480px;
+  margin-top: 100px; /* Move content below the logo */
 }
 
+/* TEXT COLORS - LIGHT */
 .mega-content h1 {
-  font-size: 2.4rem;
-  font-weight: 800;
-  margin-bottom: 6px;
+  color: #0d47a1;
 }
 
 .subtitle {
-  font-weight: 600;
-  opacity: 0.95;
+  color: #1565c0;
 }
 
 .desc {
-  margin-top: 12px;
-  opacity: 0.9;
-  line-height: 1.5;
+  color: #455a64;
+}
+
+/* TEXT COLORS - DARK */
+.dark .mega-content h1 {
+  color: #e3f2fd;
+}
+
+.dark .subtitle {
+  color: #90caf9;
+}
+
+.dark .desc {
+  color: #b0bec5;
 }
 
 .mega-stats {
@@ -379,12 +396,20 @@ onUnmounted(() => {
   margin-top: 32px;
 }
 
+/* STATS - LIGHT */
 .stat {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(6px);
-  padding: 14px 18px;
-  border-radius: 14px;
-  text-align: center;
+  background: transparent;
+  border: none;
+  color: #0f5088;
+}
+
+/* STATS - DARK */
+.dark .stat {
+  color: #e3f2fd;
+}
+
+.dark .stat span {
+  color: #b0bec5;
 }
 
 .stat strong {
@@ -451,5 +476,33 @@ onUnmounted(() => {
 .footer-inner .center span {
   margin: 0 10px;
   white-space: nowrap;
+}
+
+.mega-content h1 {
+  color: #0d47a1;
+}
+
+.subtitle {
+  color: #1565c0;
+}
+
+.desc {
+  color: #455a64;
+}
+
+.logo-white {
+  padding: 10px;
+  border-radius: 14px;
+  background: #f5f9ff;
+  border: 1px solid #e3f2fd;
+}
+
+.mega-logo {
+  position: absolute; /* Take it out of normal flow */
+  top: 24px; /* Distance from top */
+  left: 24px; /* Distance from left */
+  width: 140px; /* Bigger logo */
+  height: auto; /* Maintain aspect ratio */
+  z-index: 3; /* Above overlay */
 }
 </style>
