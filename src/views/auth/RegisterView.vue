@@ -68,7 +68,7 @@ onUnmounted(() => {
       <div class="auth-wrapper">
         <v-card class="mega-auth-card" elevation="16" rounded="xl">
           <div class="mega-grid">
-            <!-- LEFT SIDE (SAME AS LOGIN) -->
+            <!-- LEFT SIDE -->
             <div class="mega-left">
               <div class="mega-content">
                 <v-img src="/images/logo.png" width="110" class="mb-4" />
@@ -98,6 +98,15 @@ onUnmounted(() => {
 
             <!-- RIGHT SIDE -->
             <div class="mega-right">
+              <!-- Logo shown only on mobile -->
+              <v-img
+                v-if="mobile"
+                src="/images/logo.png"
+                class="mobile-logo"
+                max-width="140"
+                contain
+              />
+
               <div class="login-header">
                 <h2>Create Account</h2>
                 <p>Fill in the details to get started</p>
@@ -175,20 +184,40 @@ onUnmounted(() => {
   padding: 24px;
 }
 
-/* MEGA CARD */
+/* MEGA CARD - Improved default width */
 .mega-auth-card {
-  width: 60%;
+  width: 90%; /* Better for both desktop and mobile */
   max-width: 1200px;
   overflow: hidden;
+  margin: 0 auto; /* Ensure centering */
 }
 
+/* GRID */
 .mega-grid {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
 }
+
 @media (max-width: 960px) {
   .mega-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Hide left branding side on mobile */
+  .mega-left {
+    display: none !important;
+  }
+
+  /* Right side (form) takes full space */
+  .mega-right {
+    padding: 40px 24px;
+  }
+
+  /* Optional: tighter padding on very small screens */
+  @media (max-width: 600px) {
+    .mega-right {
+      padding: 32px 20px;
+    }
   }
 }
 
@@ -327,5 +356,26 @@ onUnmounted(() => {
 .footer-inner .center span {
   margin: 0 10px;
   white-space: nowrap;
+}
+/* Mobile-only logo */
+.mobile-logo {
+  display: block;
+  margin: 0 auto 32px auto;
+  width: 140px;
+  height: auto;
+}
+
+/* Smaller on very small screens */
+@media (max-width: 600px) {
+  .mobile-logo {
+    width: 120px;
+  }
+}
+
+/* Adjust header spacing after mobile logo */
+@media (max-width: 960px) {
+  .login-header {
+    margin-top: 8px;
+  }
 }
 </style>

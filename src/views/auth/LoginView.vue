@@ -68,7 +68,7 @@ onUnmounted(() => {
       <div class="auth-wrapper">
         <v-card class="mega-auth-card" elevation="16" rounded="xl">
           <div class="mega-grid">
-            <!-- Welcome + Branding Side -->
+            <!-- Welcome + Branding Side (hidden on mobile) -->
             <div class="mega-left">
               <v-img src="/images/logo.png" class="mega-logo" />
 
@@ -101,6 +101,15 @@ onUnmounted(() => {
 
             <!-- Login Side -->
             <div class="mega-right">
+              <!-- Logo shown only on mobile -->
+              <v-img
+                v-if="mobile"
+                src="/images/logo.png"
+                class="mobile-logo"
+                max-width="140"
+                contain
+              />
+
               <div class="login-header">
                 <h2>Sign in</h2>
                 <p>Enter your credentials to continue</p>
@@ -124,7 +133,7 @@ onUnmounted(() => {
       </div>
     </v-main>
 
-    <!-- Footer (OUTSIDE v-main) -->
+    <!-- Footer -->
     <v-footer app class="auth-footer" :class="theme">
       <div class="footer-inner">
         <div class="left">© 2025 BCWD Complaint System</div>
@@ -332,6 +341,30 @@ onUnmounted(() => {
   .mega-grid {
     grid-template-columns: 1fr;
   }
+
+  /* Hide left side completely on mobile */
+  .mega-left {
+    display: none !important;
+  }
+
+  /* Right side takes full space */
+  .mega-right {
+    padding: 40px 24px;
+  }
+
+  /* Make card full-width on mobile */
+  .mega-auth-card {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 16px;
+  }
+
+  /* Optional: smaller padding for very small screens */
+  @media (max-width: 600px) {
+    .mega-right {
+      padding: 32px 20px;
+    }
+  }
 }
 
 /* LEFT SIDE - THEME AWARE */
@@ -504,5 +537,27 @@ onUnmounted(() => {
   width: 140px; /* Bigger logo */
   height: auto; /* Maintain aspect ratio */
   z-index: 3; /* Above overlay */
+}
+
+/* Mobile-only logo */
+.mobile-logo {
+  display: block;
+  margin: 0 auto 32px auto;
+  width: 140px;
+  height: auto;
+}
+
+/* Optional: slightly smaller on very small screens */
+@media (max-width: 600px) {
+  .mobile-logo {
+    width: 120px;
+  }
+}
+
+/* Make sure the form header has proper spacing after mobile logo */
+@media (max-width: 960px) {
+  .login-header {
+    margin-top: 8px;
+  }
 }
 </style>
