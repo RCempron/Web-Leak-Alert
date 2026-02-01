@@ -207,7 +207,12 @@ onMounted(loadReports)
             { title: 'Landmark', key: 'landmark' },
             { title: 'Reported', key: 'created_at' },
             { title: 'Status', key: 'status' },
-            { title: 'Actions', key: 'actions', sortable: false },
+            {
+              title: 'Actions',
+              key: 'actions',
+              sortable: false,
+              align: 'start',
+            },
           ]"
           :items="filteredReports"
           :loading="loading"
@@ -240,8 +245,8 @@ onMounted(loadReports)
             />
           </template>
           <template #item.actions="{ item }">
-            <v-btn icon @click="openReportDetails(item)">
-              <v-icon>mdi-eye</v-icon>
+            <v-btn color="primary" variant="flat" size="small" @click="openReportDetails(item)">
+              View report details
             </v-btn>
           </template>
         </v-data-table>
