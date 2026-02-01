@@ -4,29 +4,23 @@ import { supabase } from '@/utils/supabase'
 import { useRouter } from 'vue-router'
 import { ref, onMounted, watch, computed } from 'vue'
 import { useDisplay, useTheme } from 'vuetify'
-
 const { mobile } = useDisplay()
 const vuetifyTheme = useTheme()
 const router = useRouter()
-
 // ── THEME ───────────────────────────────────────────────
 const theme = ref(localStorage.getItem('theme') || 'light')
 vuetifyTheme.global.name.value = theme.value
-
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', theme.value)
   vuetifyTheme.global.name.value = theme.value
 }
-
 watch(theme, (v) => {
   vuetifyTheme.global.name.value = v
 })
-
 // ── SIDEBAR STATE ───────────────────────────────────────
 const drawer = ref(!mobile.value)
 const rail = ref(false)
-
 // Unified toggle for hamburger button
 function toggleSidebar() {
   if (mobile.value) {
@@ -35,7 +29,6 @@ function toggleSidebar() {
     rail.value = !rail.value
   }
 }
-
 watch(mobile, (isMobile) => {
   if (isMobile) {
     drawer.value = false // close on mobile resize
@@ -45,7 +38,6 @@ watch(mobile, (isMobile) => {
     rail.value = false
   }
 })
-
 // ── STATES ──────────────────────────────────────────────
 const reports = ref([])
 const loading = ref(true)
@@ -53,7 +45,6 @@ const errorMessage = ref('')
 const search = ref('')
 const selectedStatus = ref('All')
 const statuses = ['All', 'Pending', 'Ongoing', 'Resolved', 'Rejected']
-
 const statusColors = {
   All: 'grey',
   Pending: 'warning',
@@ -61,16 +52,14 @@ const statusColors = {
   Resolved: 'success',
   Rejected: 'error',
 }
-
 const showReportDialog = ref(false)
 const selectedReport = ref(null)
+const reporterName = ref('')
 const showImageViewer = ref(false)
 const activeImage = ref('')
 const zoomLevel = ref(1)
-
 // Placeholder — replace with real user data later
 const adminName = 'Administrator'
-
 // ── COMPUTED ────────────────────────────────────────────
 const filteredReports = computed(() => {
   let list = reports.value
@@ -88,7 +77,6 @@ const filteredReports = computed(() => {
   }
   return list
 })
-
 // ── FUNCTIONS ───────────────────────────────────────────
 async function loadReports() {
   loading.value = true
@@ -105,7 +93,6 @@ async function loadReports() {
     loading.value = false
   }
 }
-
 async function updateStatus(reportId, newStatus) {
   await supabase
     .from('reports')
@@ -117,42 +104,41 @@ async function updateStatus(reportId, newStatus) {
     .eq('id', reportId)
   await loadReports()
 }
-
-function openReportDetails(report) {
+async function openReportDetails(report) {
   selectedReport.value = report
+  const { data, error } = await supabase.rpc('get_user_full_name', { user_id: report.user_id })
+  if (error) {
+    console.error(error)
+    reporterName.value = 'Unknown'
+  } else {
+    reporterName.value = data || 'Unknown'
+  }
   showReportDialog.value = true
   if (!report.viewed_by_admin) {
-    supabase.from('reports').update({ viewed_by_admin: true }).eq('id', report.id)
+    await supabase.from('reports').update({ viewed_by_admin: true }).eq('id', report.id)
     report.viewed_by_admin = true
   }
 }
-
 function openImageViewer(img) {
   activeImage.value = img
   zoomLevel.value = 1
   showImageViewer.value = true
 }
-
 function zoomIn() {
   zoomLevel.value = Math.min(zoomLevel.value + 0.25, 3)
 }
-
 function zoomOut() {
   zoomLevel.value = Math.max(zoomLevel.value - 0.25, 0.5)
 }
-
 function resetZoom() {
   zoomLevel.value = 1
 }
-
 async function logout() {
   await supabase.auth.signOut()
   router.replace('/login')
 }
-
 onMounted(loadReports)
 </script>
-
 <template>
   <v-app :theme="theme">
     <!-- APP BAR -->
@@ -166,7 +152,6 @@ onMounted(loadReports)
         <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
       </v-btn>
     </v-app-bar>
-
     <!-- SIDEBAR -->
     <v-navigation-drawer
       v-model="drawer"
@@ -185,7 +170,6 @@ onMounted(loadReports)
           <v-avatar size="80" class="mb-4 elevation-6 profile-avatar" color="grey-lighten-4">
             <v-icon size="48" color="primary">mdi-account-circle</v-icon>
           </v-avatar>
-
           <div class="admin-info text-center">
             <div class="admin-name text-h6 font-weight-medium mb-1">
               {{ adminName }}
@@ -193,14 +177,11 @@ onMounted(loadReports)
             <div class="admin-role text-caption opacity-70">System Administrator</div>
           </div>
         </div>
-
         <v-divider class="my-3 mx-4" :class="{ 'mt-6': !mobile && rail }" />
-
         <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" />
         <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout" />
       </v-list>
     </v-navigation-drawer>
-
     <!-- MAIN CONTENT -->
     <v-main :class="theme === 'light' ? 'bg-grey-lighten-4' : 'bg-dark-admin'">
       <v-container fluid class="pa-3 pa-sm-6">
@@ -211,7 +192,6 @@ onMounted(loadReports)
                 {{ s }}
               </v-chip>
             </v-chip-group>
-
             <v-text-field
               v-model="search"
               label="Search reports"
@@ -221,14 +201,18 @@ onMounted(loadReports)
             />
           </v-card-text>
         </v-card>
-
         <v-data-table
           :headers="[
             { title: 'Complaint', key: 'type' },
             { title: 'Landmark', key: 'landmark' },
             { title: 'Reported', key: 'created_at' },
             { title: 'Status', key: 'status' },
-            { title: 'Actions', key: 'actions', sortable: false },
+            {
+              title: 'Actions',
+              key: 'actions',
+              sortable: false,
+              align: 'start',
+            },
           ]"
           :items="filteredReports"
           :loading="loading"
@@ -248,11 +232,9 @@ onMounted(loadReports)
               </v-chip>
             </div>
           </template>
-
           <template #item.created_at="{ item }">
             {{ new Date(item.created_at).toLocaleDateString('en-PH') }}
           </template>
-
           <template #item.status="{ item }">
             <v-select
               :model-value="item.status"
@@ -262,16 +244,14 @@ onMounted(loadReports)
               @update:modelValue="(v) => updateStatus(item.id, v)"
             />
           </template>
-
           <template #item.actions="{ item }">
-            <v-btn icon @click="openReportDetails(item)">
-              <v-icon>mdi-eye</v-icon>
+            <v-btn color="primary" variant="flat" size="small" @click="openReportDetails(item)">
+              View report details
             </v-btn>
           </template>
         </v-data-table>
       </v-container>
     </v-main>
-
     <!-- Dialogs remain unchanged -->
     <v-dialog v-model="showReportDialog" :max-width="mobile ? '100%' : 820">
       <v-card rounded="xl" class="pa-4">
@@ -279,6 +259,7 @@ onMounted(loadReports)
         <v-divider />
         <v-card-text v-if="selectedReport">
           <p><strong>Type:</strong> {{ selectedReport.type }}</p>
+          <p><strong>Reported by:</strong> {{ reporterName }}</p>
           <p><strong>Severity:</strong> {{ selectedReport.severity }}</p>
           <p><strong>Landmark:</strong> {{ selectedReport.landmark }}</p>
           <p><strong>Notes:</strong> {{ selectedReport.notes }}</p>
@@ -301,7 +282,6 @@ onMounted(loadReports)
         </v-card-actions>
       </v-card>
     </v-dialog>
-
     <v-dialog v-model="showImageViewer" max-width="900">
       <v-card>
         <v-card-text
@@ -325,53 +305,43 @@ onMounted(loadReports)
     </v-dialog>
   </v-app>
 </template>
-
 <style scoped>
 .bg-dark-admin {
   background-color: #121212;
 }
-
 .zoomable-image {
   max-width: 100%;
   max-height: 70vh;
   transition: transform 0.2s ease;
 }
-
 .cursor-pointer {
   cursor: pointer;
 }
-
 /* ── Sidebar Profile ─────────────────────────────── */
 .sidebar-profile {
   padding: 28px 16px 20px !important;
   transition: all 0.3s ease;
 }
-
 .profile-avatar {
   border: 3px solid rgba(255, 255, 255, 0.2);
   background-color: white !important;
   transition: all 0.25s ease;
 }
-
 .profile-avatar:hover {
   transform: scale(1.06);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
 }
-
 .admin-info {
   line-height: 1.3;
 }
-
 .admin-name {
   color: rgba(255, 255, 255, 0.96);
   letter-spacing: 0.3px;
 }
-
 .admin-role {
   color: rgba(255, 255, 255, 0.62);
   margin-top: 3px;
 }
-
 /* When rail → completely hide profile */
 .v-navigation-drawer--rail .sidebar-profile {
   display: none !important;
