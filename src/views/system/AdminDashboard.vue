@@ -1,27 +1,64 @@
 <!-- src/views/system/AdminDashboard.vue -->
 <script setup>
-import { supabase } from '@/utils/supabase'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ref, onMounted, watch, computed } from 'vue'
 import { useDisplay, useTheme } from 'vuetify'
+import { supabase } from '@/utils/supabase'
+
 const { mobile } = useDisplay()
-const vuetifyTheme = useTheme()
 const router = useRouter()
-// ── THEME ───────────────────────────────────────────────
-const theme = ref(localStorage.getItem('theme') || 'light')
-vuetifyTheme.global.name.value = theme.value
+const vuetifyTheme = useTheme()
+
+// ── Theme ───────────────────────────────────────────────
+const theme = ref(localStorage.getItem('theme') ?? 'light')
+vuetifyTheme.change(theme.value)
+
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', theme.value)
-  vuetifyTheme.global.name.value = theme.value
+  vuetifyTheme.change(theme.value)
+  showSnackbar('Theme changed')
 }
-watch(theme, (v) => {
-  vuetifyTheme.global.name.value = v
+
+// ── Real-time PH Time ───────────────────────────────────
+const phTime = ref('')
+const timeFormat = ref(localStorage.getItem('timeFormat') || '24')
+let timer = null
+
+function updatePhTime() {
+  const now = new Date()
+  phTime.value = new Intl.DateTimeFormat('en-PH', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: timeFormat.value === '12',
+    timeZone: 'Asia/Manila',
+  }).format(now)
+}
+
+watch(timeFormat, (val) => {
+  localStorage.setItem('timeFormat', val)
+  updatePhTime()
+  showSnackbar('Time format changed')
 })
-// ── SIDEBAR STATE ───────────────────────────────────────
+
+onMounted(() => {
+  updatePhTime()
+  timer = setInterval(updatePhTime, 1000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
+
+// ── Sidebar ─────────────────────────────────────────────
 const drawer = ref(!mobile.value)
 const rail = ref(false)
-// Unified toggle for hamburger button
+
 function toggleSidebar() {
   if (mobile.value) {
     drawer.value = !drawer.value
@@ -29,40 +66,57 @@ function toggleSidebar() {
     rail.value = !rail.value
   }
 }
+
 watch(mobile, (isMobile) => {
   if (isMobile) {
-    drawer.value = false // close on mobile resize
+    drawer.value = false
     rail.value = false
   } else {
-    drawer.value = true // open on desktop
+    drawer.value = true
     rail.value = false
   }
 })
-// ── STATES ──────────────────────────────────────────────
+
+// ── View State ──────────────────────────────────────────
+const currentView = ref('dashboard')
+
+// ── Settings ────────────────────────────────────────────
+const itemsPerPage = ref(parseInt(localStorage.getItem('adminItemsPerPage')) || 10)
+
+watch(itemsPerPage, (val) => {
+  localStorage.setItem('adminItemsPerPage', val.toString())
+  showSnackbar('Items per page changed')
+})
+
+// ── Snackbar ────────────────────────────────────────────
+const snackbar = ref(false)
+const snackbarMessage = ref('')
+
+function showSnackbar(message) {
+  snackbarMessage.value = message
+  snackbar.value = true
+}
+
+// ── Reports Data & Filtering ────────────────────────────
 const reports = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
 const search = ref('')
 const selectedStatus = ref('All')
-const statuses = ['All', 'Pending', 'Ongoing', 'Resolved', 'Rejected']
+const statuses = ['All', 'New', 'Pending', 'Ongoing', 'Resolved', 'Rejected']
+
 const statusColors = {
   All: 'grey',
+  New: 'error',
   Pending: 'warning',
   Ongoing: 'primary',
   Resolved: 'success',
   Rejected: 'error',
 }
-const showReportDialog = ref(false)
-const selectedReport = ref(null)
-const reporterName = ref('')
-const showImageViewer = ref(false)
-const activeImage = ref('')
-const zoomLevel = ref(1)
-// Placeholder — replace with real user data later
-const adminName = 'Administrator'
-// ── COMPUTED ────────────────────────────────────────────
+
 const filteredReports = computed(() => {
   let list = reports.value
+
   if (search.value.trim()) {
     const term = search.value.toLowerCase()
     list = list.filter(
@@ -72,12 +126,44 @@ const filteredReports = computed(() => {
         r.notes?.toLowerCase().includes(term),
     )
   }
-  if (selectedStatus.value !== 'All') {
+
+  if (selectedStatus.value === 'New') {
+    list = list.filter((r) => !r.viewed_by_admin)
+  } else if (selectedStatus.value !== 'All') {
     list = list.filter((r) => r.status?.toLowerCase() === selectedStatus.value.toLowerCase())
   }
+
   return list
 })
-// ── FUNCTIONS ───────────────────────────────────────────
+
+// ── Report Dialog & Image Viewer ────────────────────────
+const showReportDialog = ref(false)
+const selectedReport = ref(null)
+const reporterName = ref('')
+
+const showImageViewer = ref(false)
+const activeImage = ref('')
+const zoomLevel = ref(1)
+
+function openImageViewer(img) {
+  activeImage.value = img
+  zoomLevel.value = 1
+  showImageViewer.value = true
+}
+
+function zoomIn() {
+  zoomLevel.value = Math.min(zoomLevel.value + 0.25, 3)
+}
+
+function zoomOut() {
+  zoomLevel.value = Math.max(zoomLevel.value - 0.25, 0.5)
+}
+
+function resetZoom() {
+  zoomLevel.value = 1
+}
+
+// ── Data Loading ────────────────────────────────────────
 async function loadReports() {
   loading.value = true
   try {
@@ -85,6 +171,7 @@ async function loadReports() {
       .from('reports')
       .select('*')
       .order('created_at', { ascending: false })
+
     if (error) throw error
     reports.value = data || []
   } catch (err) {
@@ -93,66 +180,83 @@ async function loadReports() {
     loading.value = false
   }
 }
+
 async function updateStatus(reportId, newStatus) {
   await supabase
     .from('reports')
     .update({
       status: newStatus,
       viewed_by_admin: true,
-      updated_at: new Date(),
+      updated_at: new Date().toISOString(),
     })
     .eq('id', reportId)
+
   await loadReports()
 }
+
 async function openReportDetails(report) {
   selectedReport.value = report
-  const { data, error } = await supabase.rpc('get_user_full_name', { user_id: report.user_id })
-  if (error) {
-    console.error(error)
-    reporterName.value = 'Unknown'
-  } else {
-    reporterName.value = data || 'Unknown'
-  }
+
+  const { data, error } = await supabase.rpc('get_user_full_name', {
+    user_id: report.user_id,
+  })
+
+  reporterName.value = error ? 'Unknown' : data || 'Unknown'
   showReportDialog.value = true
+
   if (!report.viewed_by_admin) {
     await supabase.from('reports').update({ viewed_by_admin: true }).eq('id', report.id)
-    report.viewed_by_admin = true
+
+    const found = reports.value.find((r) => r.id === report.id)
+    if (found) found.viewed_by_admin = true
   }
 }
-function openImageViewer(img) {
-  activeImage.value = img
-  zoomLevel.value = 1
-  showImageViewer.value = true
-}
-function zoomIn() {
-  zoomLevel.value = Math.min(zoomLevel.value + 0.25, 3)
-}
-function zoomOut() {
-  zoomLevel.value = Math.max(zoomLevel.value - 0.25, 0.5)
-}
-function resetZoom() {
-  zoomLevel.value = 1
-}
+
 async function logout() {
   await supabase.auth.signOut()
   router.replace('/login')
 }
-onMounted(loadReports)
+
+// ── Lifecycle ───────────────────────────────────────────
+onMounted(async () => {
+  await loadReports()
+})
 </script>
+
 <template>
   <v-app :theme="theme">
-    <!-- APP BAR -->
-    <v-app-bar flat density="comfortable" :color="theme === 'light' ? '#1565c0' : '#0f1720'">
+    <!-- App Bar -->
+    <v-app-bar
+      flat
+      density="comfortable"
+      :color="theme === 'light' ? '#1565c0' : '#0f1720'"
+      class="px-2 px-sm-6"
+    >
       <v-btn icon @click="toggleSidebar">
         <v-icon>mdi-menu</v-icon>
       </v-btn>
-      <v-toolbar-title class="font-weight-bold"> Admin Dashboard </v-toolbar-title>
+
+      <v-toolbar-title class="font-weight-bold">Admin Dashboard</v-toolbar-title>
+
       <v-spacer />
-      <v-btn icon @click="toggleTheme">
-        <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
-      </v-btn>
+
+      <div class="d-flex align-center gap-3">
+        <div
+          class="text-caption text-white font-weight-medium ph-time"
+          :class="{ 'd-none d-sm-block': mobile }"
+        >
+          {{ phTime }}
+        </div>
+
+        <!-- <v-btn icon @click="toggleTheme" color="white">
+          <v-icon>
+            {{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}
+          </v-icon>
+        </v-btn> -->
+      </div>
     </v-app-bar>
-    <!-- SIDEBAR -->
+
+    <!-- Navigation Drawer -->
     <v-navigation-drawer
       v-model="drawer"
       :temporary="mobile"
@@ -162,7 +266,6 @@ onMounted(loadReports)
       dark
     >
       <v-list nav density="compact">
-        <!-- Profile - hidden completely in rail mode -->
         <div
           class="sidebar-profile pa-5 d-flex flex-column align-center"
           :class="{ 'd-none': !mobile && rail }"
@@ -171,101 +274,211 @@ onMounted(loadReports)
             <v-icon size="48" color="primary">mdi-account-circle</v-icon>
           </v-avatar>
           <div class="admin-info text-center">
-            <div class="admin-name text-h6 font-weight-medium mb-1">
-              {{ adminName }}
-            </div>
+            <div class="admin-name text-h6 font-weight-medium mb-1">Administrator</div>
             <div class="admin-role text-caption opacity-70">System Administrator</div>
           </div>
         </div>
+
         <v-divider class="my-3 mx-4" :class="{ 'mt-6': !mobile && rail }" />
-        <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" />
-        <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout" />
+
+        <v-list-item
+          prepend-icon="mdi-view-dashboard"
+          title="Dashboard"
+          :active="currentView === 'dashboard'"
+          @click="currentView = 'dashboard'"
+        />
+
+        <v-list-item
+          prepend-icon="mdi-cog"
+          title="Settings"
+          :active="currentView === 'settings'"
+          @click="currentView = 'settings'"
+        />
+
+        <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout" class="mt-8" />
       </v-list>
+
+      <div class="sidebar-lump" @click="toggleSidebar">
+        <v-icon size="22">
+          {{ drawer ? 'mdi-chevron-left' : 'mdi-chevron-right' }}
+        </v-icon>
+      </div>
     </v-navigation-drawer>
-    <!-- MAIN CONTENT -->
-    <v-main :class="theme === 'light' ? 'bg-grey-lighten-4' : 'bg-dark-admin'">
-      <v-container fluid class="pa-3 pa-sm-6">
-        <v-card flat class="mb-4">
-          <v-card-text>
-            <v-chip-group v-model="selectedStatus" mandatory>
-              <v-chip v-for="s in statuses" :key="s" :value="s" :color="statusColors[s]">
-                {{ s }}
-              </v-chip>
-            </v-chip-group>
-            <v-text-field
-              v-model="search"
-              label="Search reports"
-              prepend-inner-icon="mdi-magnify"
-              density="compact"
-              class="mt-3"
-            />
-          </v-card-text>
-        </v-card>
-        <v-data-table
-          :headers="[
-            { title: 'Complaint', key: 'type' },
-            { title: 'Landmark', key: 'landmark' },
-            { title: 'Reported', key: 'created_at' },
-            { title: 'Status', key: 'status' },
-            {
-              title: 'Actions',
-              key: 'actions',
-              sortable: false,
-              align: 'start',
-            },
-          ]"
-          :items="filteredReports"
-          :loading="loading"
-          class="elevation-1"
-        >
-          <template #item.type="{ item }">
-            <div class="d-flex align-center gap-2">
-              <v-icon color="error">mdi-water-alert</v-icon>
-              <span>{{ item.type }}</span>
-              <v-chip
-                v-if="!item.viewed_by_admin && item.status === 'pending'"
-                size="x-small"
-                color="deep-orange"
-                label
-              >
-                NEW
-              </v-chip>
+
+    <!-- Main Content -->
+    <v-main class="bg-grey-lighten-4">
+      <v-container fluid class="pa-4 pa-md-6 pb-6 pb-md-10">
+        <!-- Dashboard View -->
+        <div v-if="currentView === 'dashboard'">
+          <v-card flat class="mb-4">
+            <v-card-text>
+              <v-chip-group v-model="selectedStatus" mandatory>
+                <v-chip v-for="s in statuses" :key="s" :value="s" :color="statusColors[s]">
+                  {{ s }}
+                </v-chip>
+              </v-chip-group>
+
+              <v-text-field
+                v-model="search"
+                label="Search reports"
+                prepend-inner-icon="mdi-magnify"
+                density="compact"
+                class="mt-3"
+              />
+            </v-card-text>
+          </v-card>
+
+          <v-data-table
+            :headers="[
+              { title: 'Complaint', key: 'type' },
+              { title: 'Landmark', key: 'landmark' },
+              { title: 'Reported', key: 'created_at' },
+              { title: 'Status', key: 'status' },
+              { title: 'Actions', key: 'actions', sortable: false },
+            ]"
+            :items="filteredReports"
+            :loading="loading"
+            :items-per-page="itemsPerPage"
+            :footer-props="{ itemsPerPageOptions: [] }"
+            class="elevation-1"
+          >
+            <template #item.created_at="{ item }">
+              {{ new Date(item.created_at).toLocaleDateString('en-PH') }}
+            </template>
+
+            <template #item.status="{ item }">
+              <v-select
+                :model-value="item.status"
+                :items="['pending', 'ongoing', 'resolved', 'rejected']"
+                density="compact"
+                hide-details
+                @update:modelValue="(v) => updateStatus(item.id, v)"
+              />
+            </template>
+
+            <!-- Actions: View details button + NEW indicator (increased spacing) -->
+            <template #item.actions="{ item }">
+              <div class="d-flex align-center gap-4">
+                <!-- Changed from gap-3 to gap-4 -->
+                <v-btn size="small" color="primary" @click="openReportDetails(item)">
+                  View details
+                </v-btn>
+
+                <v-chip v-if="!item.viewed_by_admin" color="error" size="small" label> NEW </v-chip>
+              </div>
+            </template>
+          </v-data-table>
+        </div>
+
+        <!-- Settings View -->
+        <div v-else-if="currentView === 'settings'">
+          <v-card
+            class="pa-3 pa-sm-5 text-center modern-card mx-auto"
+            :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
+            elevation="10"
+            rounded="xl"
+            max-width="700"
+          >
+            <v-avatar size="90" class="mb-4">
+              <v-icon size="90" color="primary">mdi-cog</v-icon>
+            </v-avatar>
+            <h2 class="font-weight-bold mb-2">Settings</h2>
+            <p class="text-medium-emphasis mb-6">Manage your application settings</p>
+
+            <v-list lines="one" class="pa-0">
+              <v-list-group value="appearance">
+                <template v-slot:activator="{ props }">
+                  <v-list-item v-bind="props" prepend-icon="mdi-palette" title="Appearance" />
+                </template>
+                <v-list-item title="Theme" prepend-icon="mdi-theme-light-dark">
+                  <template v-slot:append>
+                    <v-select
+                      v-model="theme"
+                      :items="[
+                        { value: 'light', title: 'Light' },
+                        { value: 'dark', title: 'Dark' },
+                      ]"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      style="width: 150px"
+                    />
+                  </template>
+                </v-list-item>
+              </v-list-group>
+
+              <v-list-group value="time-display">
+                <template v-slot:activator="{ props }">
+                  <v-list-item
+                    v-bind="props"
+                    prepend-icon="mdi-clock-outline"
+                    title="Time Display"
+                  />
+                </template>
+                <v-list-item title="Time Format" prepend-icon="mdi-clock-time-twelve-outline">
+                  <template v-slot:append>
+                    <v-select
+                      v-model="timeFormat"
+                      :items="[
+                        { value: '24', title: '24-hour' },
+                        { value: '12', title: '12-hour' },
+                      ]"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      style="width: 150px"
+                    />
+                  </template>
+                </v-list-item>
+              </v-list-group>
+
+              <v-list-group value="reports">
+                <template v-slot:activator="{ props }">
+                  <v-list-item
+                    v-bind="props"
+                    prepend-icon="mdi-file-document-multiple"
+                    title="Reports"
+                  />
+                </template>
+                <v-list-item title="Items per Page" prepend-icon="mdi-view-list">
+                  <template v-slot:append>
+                    <v-select
+                      v-model="itemsPerPage"
+                      :items="[5, 10, 20, 50]"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      style="width: 150px"
+                    />
+                  </template>
+                </v-list-item>
+              </v-list-group>
+            </v-list>
+
+            <div class="button-group d-flex flex-wrap justify-center align-center mt-6">
+              <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'">
+                <v-icon start>mdi-arrow-left</v-icon> Back to Dashboard
+              </v-btn>
             </div>
-          </template>
-          <template #item.created_at="{ item }">
-            {{ new Date(item.created_at).toLocaleDateString('en-PH') }}
-          </template>
-          <template #item.status="{ item }">
-            <v-select
-              :model-value="item.status"
-              :items="['pending', 'ongoing', 'resolved', 'rejected']"
-              density="compact"
-              hide-details
-              @update:modelValue="(v) => updateStatus(item.id, v)"
-            />
-          </template>
-          <template #item.actions="{ item }">
-            <v-btn color="primary" variant="flat" size="small" @click="openReportDetails(item)">
-              View report details
-            </v-btn>
-          </template>
-        </v-data-table>
+          </v-card>
+        </div>
       </v-container>
     </v-main>
-    <!-- Dialogs remain unchanged -->
-    <v-dialog v-model="showReportDialog" :max-width="mobile ? '100%' : 820">
+
+    <!-- Report Details Dialog -->
+    <v-dialog v-model="showReportDialog" max-width="820">
       <v-card rounded="xl" class="pa-4">
         <v-card-title class="font-weight-bold">Complaint Details</v-card-title>
         <v-divider />
         <v-card-text v-if="selectedReport">
           <p><strong>Type:</strong> {{ selectedReport.type }}</p>
           <p><strong>Reported by:</strong> {{ reporterName }}</p>
-          <p><strong>Severity:</strong> {{ selectedReport.severity }}</p>
-          <p><strong>Landmark:</strong> {{ selectedReport.landmark }}</p>
-          <p><strong>Notes:</strong> {{ selectedReport.notes }}</p>
-          <v-divider class="my-4" />
-          <v-row dense>
-            <v-col v-for="(img, i) in selectedReport.images || []" :key="i" cols="6">
+          <p><strong>Severity:</strong> {{ selectedReport.severity || 'N/A' }}</p>
+          <p><strong>Landmark:</strong> {{ selectedReport.landmark || 'N/A' }}</p>
+          <p><strong>Notes:</strong> {{ selectedReport.notes || 'N/A' }}</p>
+
+          <v-row dense class="mt-4">
+            <v-col v-for="(img, i) in selectedReport.images || []" :key="i" cols="12" sm="6">
               <v-img
                 :src="img"
                 height="140"
@@ -276,12 +489,15 @@ onMounted(loadReports)
             </v-col>
           </v-row>
         </v-card-text>
+
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showReportDialog = false">Close</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Image Zoom Dialog -->
     <v-dialog v-model="showImageViewer" max-width="900">
       <v-card>
         <v-card-text
@@ -303,36 +519,24 @@ onMounted(loadReports)
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Snackbar -->
+    <v-snackbar v-model="snackbar" timeout="2000" color="success" location="bottom">
+      {{ snackbarMessage }}
+    </v-snackbar>
   </v-app>
 </template>
+
 <style scoped>
-.bg-dark-admin {
-  background-color: #121212;
+.ph-time {
+  opacity: 0.9;
 }
-.zoomable-image {
-  max-width: 100%;
-  max-height: 70vh;
-  transition: transform 0.2s ease;
-}
-.cursor-pointer {
-  cursor: pointer;
-}
-/* ── Sidebar Profile ─────────────────────────────── */
 .sidebar-profile {
   padding: 28px 16px 20px !important;
-  transition: all 0.3s ease;
 }
 .profile-avatar {
   border: 3px solid rgba(255, 255, 255, 0.2);
   background-color: white !important;
-  transition: all 0.25s ease;
-}
-.profile-avatar:hover {
-  transform: scale(1.06);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
-}
-.admin-info {
-  line-height: 1.3;
 }
 .admin-name {
   color: rgba(255, 255, 255, 0.96);
@@ -342,8 +546,60 @@ onMounted(loadReports)
   color: rgba(255, 255, 255, 0.62);
   margin-top: 3px;
 }
-/* When rail → completely hide profile */
 .v-navigation-drawer--rail .sidebar-profile {
   display: none !important;
+}
+.zoomable-image {
+  max-width: 100%;
+  max-height: 70vh;
+  transition: transform 0.2s ease;
+}
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Sidebar Lump */
+.sidebar-lump {
+  position: absolute;
+  top: 50%;
+  right: -32px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 72px;
+  border-radius: 0 36px 36px 0;
+  background-color: #1565c0;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 50;
+  box-shadow: 3px 0 12px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s ease;
+}
+.v-theme--dark .sidebar-lump {
+  background-color: #0f1720;
+}
+.sidebar-lump:hover {
+  background-color: #1976d2;
+  transform: translateY(-50%) scale(1.08);
+}
+.v-theme--dark .sidebar-lump:hover {
+  background-color: #1e293b;
+}
+.v-navigation-drawer--rail .sidebar-lump {
+  right: -32px;
+}
+
+.modern-card {
+  transition: all 0.3s ease;
+}
+.modern-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+.button-group {
+  gap: 12px;
+  width: 100%;
 }
 </style>
