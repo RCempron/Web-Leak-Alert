@@ -5,32 +5,36 @@ import { useDisplay, useTheme } from 'vuetify'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/utils/supabase.js'
 import AlertNotification from '@/components/common/AlertNotification.vue'
+
 const { mobile } = useDisplay()
 const router = useRouter()
 const vuetifyTheme = useTheme()
+
+// ── Theme ───────────────────────────────────────────────
 const theme = ref(localStorage.getItem('theme') ?? 'light')
 vuetifyTheme.change(theme.value)
-function toggleTheme() {
-  theme.value = theme.value === 'light' ? 'dark' : 'light'
-  localStorage.setItem('theme', theme.value)
-  vuetifyTheme.change(theme.value)
-}
-watch(theme, (val) => {
-  vuetifyTheme.change(val)
+
+watch(theme, (newTheme) => {
+  localStorage.setItem('theme', newTheme)
+  vuetifyTheme.change(newTheme)
   showSnackbar('Theme changed')
 })
-async function logout() {
-  await supabase.auth.signOut()
-  router.push('/login')
+
+function toggleTheme() {
+  theme.value = theme.value === 'light' ? 'dark' : 'light'
 }
+
+// ── Real-time PH Time ───────────────────────────────────
 const phTime = ref('')
 let timer = null
 const timeFormat = ref(localStorage.getItem('timeFormat') || '24')
+
 watch(timeFormat, (val) => {
   localStorage.setItem('timeFormat', val)
   updatePhTime()
   showSnackbar('Time format changed')
 })
+
 function updatePhTime() {
   const now = new Date()
   phTime.value = new Intl.DateTimeFormat('en-PH', {
@@ -45,18 +49,23 @@ function updatePhTime() {
     timeZone: 'Asia/Manila',
   }).format(now)
 }
+
 onMounted(() => {
   updatePhTime()
   timer = setInterval(updatePhTime, 1000)
 })
+
 onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
+
+// ── Reports & Filtering ─────────────────────────────────
 const updatedReports = ref(new Set())
 const lastViewedUpdates = ref(JSON.parse(localStorage.getItem('lastViewedUpdates') || '{}'))
 const notificationCount = computed(() => updatedReports.value.size)
 const hasNotifications = computed(() => notificationCount.value > 0)
 const showUpdatedOnly = ref(false)
+
 function showUpdatedReports() {
   currentView.value = 'dashboard'
   showUpdatedOnly.value = true
@@ -64,13 +73,16 @@ function showUpdatedReports() {
   selectedType.value = 'all'
   page.value = 1
 }
+
 function resetToAllReports() {
   showUpdatedOnly.value = false
   currentStatus.value = 'all'
   selectedType.value = 'all'
   page.value = 1
 }
+
 const reports = ref([])
+
 async function fetchReports() {
   const { data: userData } = await supabase.auth.getUser()
   if (!userData?.user) return
@@ -81,10 +93,12 @@ async function fetchReports() {
     .order('created_at', { ascending: false })
   reports.value = data || []
 }
+
 const baseReportsForFiltering = computed(() => {
   if (!showUpdatedOnly.value) return reports.value
   return reports.value.filter((r) => updatedReports.value.has(r.id))
 })
+
 const statusCounts = computed(() => {
   const counts = {
     all: baseReportsForFiltering.value.length,
@@ -98,6 +112,7 @@ const statusCounts = computed(() => {
   })
   return counts
 })
+
 const typeCounts = computed(() => {
   const counts = {}
   baseReportsForFiltering.value.forEach((r) => {
@@ -106,8 +121,10 @@ const typeCounts = computed(() => {
   })
   return counts
 })
+
 const currentStatus = ref('all')
 const selectedType = ref('all')
+
 const filteredReports = computed(() => {
   let filtered = baseReportsForFiltering.value
   if (currentStatus.value !== 'all') {
@@ -118,20 +135,25 @@ const filteredReports = computed(() => {
   }
   return filtered
 })
+
 const page = ref(1)
 const itemsPerPage = ref(parseInt(localStorage.getItem('itemsPerPage')) || 10)
+
 watch(itemsPerPage, (val) => {
   localStorage.setItem('itemsPerPage', val.toString())
   showSnackbar('Items per page changed')
   page.value = 1
 })
+
 const paginatedReports = computed(() => {
   const start = (page.value - 1) * itemsPerPage.value
   return filteredReports.value.slice(start, start + itemsPerPage.value)
 })
+
 const paginationLength = computed(() =>
   Math.ceil(filteredReports.value.length / itemsPerPage.value),
 )
+
 const typeIcons = {
   'low pressure': 'mdi-water',
   'broken pipe': 'mdi-pipe-leak',
@@ -140,6 +162,7 @@ const typeIcons = {
   'water leak': 'mdi-pipe-leak',
   other: 'mdi-help-circle',
 }
+
 const typeColors = {
   'low pressure': 'red',
   'broken pipe': 'red',
@@ -148,12 +171,14 @@ const typeColors = {
   'water leak': 'red',
   other: 'grey',
 }
+
 const statusColors = {
   pending: 'amber',
   ongoing: 'blue',
   resolved: 'green',
   rejected: 'red',
 }
+
 const userName = ref('')
 async function fetchUser() {
   const { data } = await supabase.auth.getUser()
@@ -163,8 +188,11 @@ async function fetchUser() {
     data?.user?.email?.split('@')[0] ||
     'User'
 }
+
+// ── Report Dialog & Image Viewer ────────────────────────
 const dialog = ref(false)
 const selectedReport = ref(null)
+
 function openReportDetails(report) {
   selectedReport.value = report
   dialog.value = true
@@ -172,25 +200,33 @@ function openReportDetails(report) {
   localStorage.setItem('lastViewedUpdates', JSON.stringify(lastViewedUpdates.value))
   updatedReports.value.delete(report.id)
 }
+
 const showImageViewer = ref(false)
 const activeImage = ref('')
 const zoomLevel = ref(1)
+
 function openImageViewer(img) {
   activeImage.value = img
   zoomLevel.value = 1
   showImageViewer.value = true
 }
+
 function zoomIn() {
   zoomLevel.value = Math.min(zoomLevel.value + 0.25, 3)
 }
+
 function zoomOut() {
   zoomLevel.value = Math.max(zoomLevel.value - 0.25, 0.5)
 }
+
 function resetZoom() {
   zoomLevel.value = 1
 }
+
+// ── Sidebar ─────────────────────────────────────────────
 const drawer = ref(!mobile.value)
 const rail = ref(false)
+
 function toggleSidebar() {
   if (mobile.value) {
     drawer.value = !drawer.value
@@ -198,6 +234,7 @@ function toggleSidebar() {
     rail.value = !rail.value
   }
 }
+
 watch(mobile, (isMobile) => {
   if (isMobile) {
     drawer.value = false
@@ -207,6 +244,8 @@ watch(mobile, (isMobile) => {
     rail.value = false
   }
 })
+
+// ── Data Loading ────────────────────────────────────────
 async function loadData() {
   await fetchReports()
   await fetchUser()
@@ -218,8 +257,11 @@ async function loadData() {
   })
   updatedReports.value = new Set(updated.map((r) => r.id))
 }
+
 onMounted(loadData)
 onActivated(loadData)
+
+// ── Profile ─────────────────────────────────────────────
 const loading = ref(false)
 const saving = ref(false)
 const editing = ref(false)
@@ -231,6 +273,7 @@ const age = ref('')
 const residency = ref('')
 const formSuccessMessage = ref('')
 const formErrorMessage = ref('')
+
 async function loadCurrentUser() {
   loading.value = true
   try {
@@ -249,6 +292,7 @@ async function loadCurrentUser() {
     loading.value = false
   }
 }
+
 async function saveProfile() {
   if (!firstname.value || !lastname.value) {
     formErrorMessage.value = 'Please fill out all required fields.'
@@ -278,44 +322,72 @@ async function saveProfile() {
     saving.value = false
   }
 }
+
 const currentView = ref('dashboard')
 onMounted(loadCurrentUser)
+
+// ── Snackbar ────────────────────────────────────────────
 const snackbar = ref(false)
 const snackbarMessage = ref('')
+
 function showSnackbar(message) {
   snackbarMessage.value = message
   snackbar.value = true
 }
+
+async function logout() {
+  await supabase.auth.signOut()
+  router.push('/login')
+}
+
+function handleMobileNav(view) {
+  currentView.value = view
+
+  // auto-close drawer ONLY on mobile
+  if (mobile.value) {
+    drawer.value = false
+  }
+}
 </script>
+
 <template>
   <v-app :theme="theme">
+    <!-- App Bar -->
     <v-app-bar
       flat
       density="comfortable"
       :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      class="px-2 px-sm-6"
+      class="consumer-header"
     >
-      <v-toolbar-title class="font-weight-bold toolbar-title"
-        >BCWD Complaint System</v-toolbar-title
-      >
-      <v-spacer />
-      <div class="d-flex align-center gap-2">
-        <div
-          class="text-caption text-white font-weight-medium ph-time"
-          :class="{ 'd-none d-sm-block': mobile }"
-        >
-          {{ phTime }}
+      <!-- FULL-WIDTH depth layer -->
+      <div class="consumer-header-depth"></div>
+
+      <!-- header content wrapper -->
+      <div class="consumer-header-inner px-2 px-sm-6">
+        <v-toolbar-title class="font-weight-bold consumer-header-title">
+          BCWD Complaint System
+        </v-toolbar-title>
+
+        <v-spacer />
+
+        <div class="d-flex align-center gap-3 consumer-header-right">
+          <div
+            class="text-caption text-white font-weight-medium ph-time"
+            :class="{ 'd-none d-sm-block': mobile }"
+          >
+            {{ phTime }}
+          </div>
         </div>
       </div>
     </v-app-bar>
 
+    <!-- Navigation Drawer -->
     <v-navigation-drawer
       v-model="drawer"
       :temporary="mobile"
       :rail="!mobile && rail"
       :width="260"
       :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      dark
     >
       <v-list nav density="compact">
         <div
@@ -332,31 +404,34 @@ function showSnackbar(message) {
         </div>
 
         <v-divider class="my-3 mx-4" :class="{ 'mt-6': !mobile && rail }" />
+
         <v-list-item
           :active="currentView === 'dashboard'"
           prepend-icon="mdi-view-dashboard"
           title="Dashboard"
           class="mb-1"
-          @click="currentView = 'dashboard'"
+          @click="handleMobileNav('dashboard')"
         />
+
         <v-list-item
           :active="currentView === 'profile'"
           prepend-icon="mdi-account-circle"
           title="Profile"
           class="mb-1"
-          @click="currentView = 'profile'"
+          @click="handleMobileNav('profile')"
         />
+
         <v-list-item
           :active="currentView === 'settings'"
           prepend-icon="mdi-cog"
           title="Settings"
           class="mb-1"
-          @click="currentView = 'settings'"
+          @click="handleMobileNav('settings')"
         />
+
         <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout" class="mt-8" />
       </v-list>
 
-      <!-- Sidebar Edge Lump Toggle (notification badge removed) -->
       <div class="sidebar-lump" @click="toggleSidebar">
         <v-icon size="22">
           {{ drawer ? 'mdi-chevron-left' : 'mdi-chevron-right' }}
@@ -364,10 +439,8 @@ function showSnackbar(message) {
       </div>
     </v-navigation-drawer>
 
-    <!-- v-main with flex layout for sticky footer -->
-    <v-main class="bg-grey-lighten-4">
-      <!-- Scrollable content -->
-
+    <!-- Main Content -->
+    <v-main :class="theme === 'light' ? 'bg-grey-lighten-4' : 'bg-grey-darken-4'">
       <v-container fluid class="pa-4 pa-md-6 pb-6 pb-md-10">
         <div class="text-center mb-6 mb-md-8">
           <h2 class="font-weight-bold mb-2" :class="mobile ? 'text-h6' : 'text-h4'">
@@ -378,6 +451,7 @@ function showSnackbar(message) {
           </p>
         </div>
 
+        <!-- Dashboard View -->
         <div v-if="currentView === 'dashboard'">
           <v-card rounded="lg" elevation="2" class="position-relative">
             <v-card-title class="d-flex align-center justify-space-between py-4 px-6">
@@ -543,6 +617,7 @@ function showSnackbar(message) {
           </v-card>
         </div>
 
+        <!-- Profile View -->
         <div v-else-if="currentView === 'profile'">
           <v-card
             class="pa-3 pa-sm-5 text-center modern-card mx-auto"
@@ -642,6 +717,7 @@ function showSnackbar(message) {
           </v-card>
         </div>
 
+        <!-- Settings View -->
         <div v-else-if="currentView === 'settings'">
           <v-card
             class="pa-3 pa-sm-5 text-center modern-card mx-auto"
@@ -661,11 +737,7 @@ function showSnackbar(message) {
             <v-list lines="one" class="pa-0">
               <v-list-group value="appearance">
                 <template v-slot:activator="{ props }">
-                  <v-list-item
-                    v-bind="props"
-                    prepend-icon="mdi-palette"
-                    title="Appearance"
-                  ></v-list-item>
+                  <v-list-item v-bind="props" prepend-icon="mdi-palette" title="Appearance" />
                 </template>
                 <v-list-item title="Theme" prepend-icon="mdi-theme-light-dark">
                   <template v-slot:append>
@@ -679,17 +751,18 @@ function showSnackbar(message) {
                       hide-details
                       variant="outlined"
                       style="width: 150px"
-                    ></v-select>
+                    />
                   </template>
                 </v-list-item>
               </v-list-group>
+
               <v-list-group value="time-display">
                 <template v-slot:activator="{ props }">
                   <v-list-item
                     v-bind="props"
                     prepend-icon="mdi-clock-outline"
                     title="Time Display"
-                  ></v-list-item>
+                  />
                 </template>
                 <v-list-item title="Time Format" prepend-icon="mdi-clock-time-twelve-outline">
                   <template v-slot:append>
@@ -703,17 +776,18 @@ function showSnackbar(message) {
                       hide-details
                       variant="outlined"
                       style="width: 150px"
-                    ></v-select>
+                    />
                   </template>
                 </v-list-item>
               </v-list-group>
+
               <v-list-group value="reports">
                 <template v-slot:activator="{ props }">
                   <v-list-item
                     v-bind="props"
                     prepend-icon="mdi-file-document-multiple"
                     title="Reports"
-                  ></v-list-item>
+                  />
                 </template>
                 <v-list-item title="Items per Page" prepend-icon="mdi-view-list">
                   <template v-slot:append>
@@ -724,11 +798,12 @@ function showSnackbar(message) {
                       hide-details
                       variant="outlined"
                       style="width: 150px"
-                    ></v-select>
+                    />
                   </template>
                 </v-list-item>
               </v-list-group>
             </v-list>
+
             <div class="button-group d-flex flex-wrap justify-center align-center mt-6">
               <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'">
                 <v-icon start>mdi-arrow-left</v-icon> Back
@@ -737,10 +812,9 @@ function showSnackbar(message) {
           </v-card>
         </div>
       </v-container>
-
-      <!-- Mobile Footer (pushed to bottom) -->
     </v-main>
 
+    <!-- Mobile Footer -->
     <v-row v-if="mobile" class="mt-auto mx-0">
       <v-col cols="12" class="px-0">
         <div
@@ -898,11 +972,13 @@ function showSnackbar(message) {
       </v-card>
     </v-dialog>
 
+    <!-- Snackbar -->
     <v-snackbar v-model="snackbar" timeout="2000" color="success" location="bottom">
       {{ snackbarMessage }}
     </v-snackbar>
   </v-app>
 </template>
+
 <style scoped>
 .ph-time {
   opacity: 0.9;
@@ -1048,5 +1124,70 @@ function showSnackbar(message) {
 
 .footer-mobile-content {
   width: 100%;
+}
+
+/* ============================= */
+/* CONSUMER HEADER DEPTH SYSTEM */
+/* ============================= */
+
+.consumer-header {
+  position: relative;
+  padding: 0 !important;
+  overflow: hidden;
+  z-index: 30;
+
+  /* elevation */
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.25),
+    0 6px 18px rgba(0, 0, 0, 0.18);
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* full-width depth layer */
+.consumer-header-depth {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 0;
+
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.05),
+    rgba(0, 0, 0, 0.22)
+  );
+}
+
+/* content wrapper */
+.consumer-header-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* title depth */
+.consumer-header-title {
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  letter-spacing: 0.4px;
+}
+
+/* right side depth */
+.consumer-header-right {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* dark mode tuning */
+.v-theme--dark .consumer-header {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.55),
+    0 10px 28px rgba(0, 0, 0, 0.65);
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 </style>

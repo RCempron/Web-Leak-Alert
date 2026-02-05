@@ -13,10 +13,14 @@ const vuetifyTheme = useTheme()
 const theme = ref(localStorage.getItem('theme') ?? 'light')
 vuetifyTheme.change(theme.value)
 
+// Watch theme changes (covers both toggle and settings select)
+watch(theme, (newTheme) => {
+  localStorage.setItem('theme', newTheme)
+  vuetifyTheme.change(newTheme)
+})
+
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
-  localStorage.setItem('theme', theme.value)
-  vuetifyTheme.change(theme.value)
   showSnackbar('Theme changed')
 }
 
@@ -221,6 +225,15 @@ async function logout() {
 onMounted(async () => {
   await loadReports()
 })
+
+function handleMobileNav(view) {
+  currentView.value = view
+
+  // auto-close drawer ONLY on mobile
+  if (mobile.value) {
+    drawer.value = false
+  }
+}
 </script>
 
 <template>
@@ -230,29 +243,24 @@ onMounted(async () => {
       flat
       density="comfortable"
       :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      class="px-2 px-sm-6"
+      class="admin-header"
     >
-      <v-btn icon @click="toggleSidebar">
-        <v-icon>mdi-menu</v-icon>
-      </v-btn>
+      <!-- FULL-WIDTH depth system -->
+      <div class="header-depth-layer"></div>
 
-      <v-toolbar-title class="font-weight-bold">Admin Dashboard</v-toolbar-title>
+      <div class="header-inner px-2 px-sm-6">
+        <v-toolbar-title class="font-weight-bold header-title"> Admin Dashboard </v-toolbar-title>
 
-      <v-spacer />
+        <v-spacer />
 
-      <div class="d-flex align-center gap-3">
-        <div
-          class="text-caption text-white font-weight-medium ph-time"
-          :class="{ 'd-none d-sm-block': mobile }"
-        >
-          {{ phTime }}
+        <div class="d-flex align-center gap-3 header-right">
+          <div
+            class="text-caption text-white font-weight-medium ph-time"
+            :class="{ 'd-none d-sm-block': mobile }"
+          >
+            {{ phTime }}
+          </div>
         </div>
-
-        <!-- <v-btn icon @click="toggleTheme" color="white">
-          <v-icon>
-            {{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}
-          </v-icon>
-        </v-btn> -->
       </div>
     </v-app-bar>
 
@@ -263,8 +271,8 @@ onMounted(async () => {
       :rail="!mobile && rail"
       :width="260"
       :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      dark
     >
+      <!-- ... rest of drawer content unchanged ... -->
       <v-list nav density="compact">
         <div
           class="sidebar-profile pa-5 d-flex flex-column align-center"
@@ -285,14 +293,14 @@ onMounted(async () => {
           prepend-icon="mdi-view-dashboard"
           title="Dashboard"
           :active="currentView === 'dashboard'"
-          @click="currentView = 'dashboard'"
+          @click="handleMobileNav('dashboard')"
         />
 
         <v-list-item
           prepend-icon="mdi-cog"
           title="Settings"
           :active="currentView === 'settings'"
-          @click="currentView = 'settings'"
+          @click="handleMobileNav('settings')"
         />
 
         <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout" class="mt-8" />
@@ -306,10 +314,11 @@ onMounted(async () => {
     </v-navigation-drawer>
 
     <!-- Main Content -->
-    <v-main class="bg-grey-lighten-4">
+    <v-main :class="theme === 'light' ? 'bg-grey-lighten-4' : 'bg-grey-darken-4'">
       <v-container fluid class="pa-4 pa-md-6 pb-6 pb-md-10">
         <!-- Dashboard View -->
         <div v-if="currentView === 'dashboard'">
+          <!-- ... unchanged dashboard content ... -->
           <v-card flat class="mb-4">
             <v-card-text>
               <v-chip-group v-model="selectedStatus" mandatory>
@@ -342,6 +351,7 @@ onMounted(async () => {
             :footer-props="{ itemsPerPageOptions: [] }"
             class="elevation-1"
           >
+            <!-- templates unchanged -->
             <template #item.created_at="{ item }">
               {{ new Date(item.created_at).toLocaleDateString('en-PH') }}
             </template>
@@ -356,15 +366,13 @@ onMounted(async () => {
               />
             </template>
 
-            <!-- Actions: View details button + NEW indicator (increased spacing) -->
             <template #item.actions="{ item }">
               <div class="d-flex align-center gap-4">
-                <!-- Changed from gap-3 to gap-4 -->
                 <v-btn size="small" color="primary" @click="openReportDetails(item)">
                   View details
                 </v-btn>
 
-                <v-chip v-if="!item.viewed_by_admin" color="error" size="small" label> NEW </v-chip>
+                <v-chip v-if="!item.viewed_by_admin" color="error" size="small" label>NEW</v-chip>
               </div>
             </template>
           </v-data-table>
@@ -372,6 +380,7 @@ onMounted(async () => {
 
         <!-- Settings View -->
         <div v-else-if="currentView === 'settings'">
+          <!-- ... unchanged settings card ... -->
           <v-card
             class="pa-3 pa-sm-5 text-center modern-card mx-auto"
             :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
@@ -379,6 +388,7 @@ onMounted(async () => {
             rounded="xl"
             max-width="700"
           >
+            <!-- ... full settings content unchanged ... -->
             <v-avatar size="90" class="mb-4">
               <v-icon size="90" color="primary">mdi-cog</v-icon>
             </v-avatar>
@@ -407,6 +417,7 @@ onMounted(async () => {
                 </v-list-item>
               </v-list-group>
 
+              <!-- time-display and reports groups unchanged -->
               <v-list-group value="time-display">
                 <template v-slot:activator="{ props }">
                   <v-list-item
@@ -465,7 +476,7 @@ onMounted(async () => {
       </v-container>
     </v-main>
 
-    <!-- Report Details Dialog -->
+    <!-- Dialogs and Snackbar unchanged -->
     <v-dialog v-model="showReportDialog" max-width="820">
       <v-card rounded="xl" class="pa-4">
         <v-card-title class="font-weight-bold">Complaint Details</v-card-title>
@@ -497,7 +508,6 @@ onMounted(async () => {
       </v-card>
     </v-dialog>
 
-    <!-- Image Zoom Dialog -->
     <v-dialog v-model="showImageViewer" max-width="900">
       <v-card>
         <v-card-text
@@ -520,7 +530,6 @@ onMounted(async () => {
       </v-card>
     </v-dialog>
 
-    <!-- Snackbar -->
     <v-snackbar v-model="snackbar" timeout="2000" color="success" location="bottom">
       {{ snackbarMessage }}
     </v-snackbar>
@@ -528,6 +537,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* All your existing styles remain unchanged */
 .ph-time {
   opacity: 0.9;
 }
@@ -558,7 +568,6 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-/* Sidebar Lump */
 .sidebar-lump {
   position: absolute;
   top: 50%;
@@ -601,5 +610,68 @@ onMounted(async () => {
 .button-group {
   gap: 12px;
   width: 100%;
+}
+/* ============================= */
+/* FULL-WIDTH HEADER DEPTH */
+/* ============================= */
+
+.admin-header {
+  position: relative;
+  padding: 0 !important; /* remove vuetify internal padding */
+  overflow: hidden;
+  z-index: 20;
+
+  /* elevation */
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.25),
+    0 6px 18px rgba(0, 0, 0, 0.18);
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* true full-width depth layer */
+.header-depth-layer {
+  position: absolute;
+  inset: 0;
+  width: 100vw; /* force viewport width */
+  left: 50%;
+  transform: translateX(-50%); /* center it */
+  pointer-events: none;
+
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.04),
+    rgba(0, 0, 0, 0.22)
+  );
+  z-index: 0;
+}
+
+/* content wrapper */
+.header-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* text depth */
+.header-title {
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  letter-spacing: 0.4px;
+}
+
+.header-right {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* dark mode tuning */
+.v-theme--dark .admin-header {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.55),
+    0 10px 28px rgba(0, 0, 0, 0.65);
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 </style>
