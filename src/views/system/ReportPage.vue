@@ -164,32 +164,26 @@ const pipeLocationOptions = [
       flat
       density="comfortable"
       :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      class="px-2 px-sm-4 header-bar"
+      class="admin-header"
     >
-      <div class="d-flex align-center gap-2 gap-sm-4">
-        <!-- <v-img src="/images/LeakAlertLogo.png" width="40" height="40" alt="logo" /> -->
-        <div>
-          <div class="font-weight-bold" :class="mobile ? 'text-body-1' : 'text-h5'">
-            BCWD Complaint System
+      <!-- FULL-WIDTH depth system -->
+      <div class="header-depth-layer"></div>
+      <div class="header-inner px-2 px-sm-6">
+        <v-toolbar-title class="font-weight-bold header-title">
+          BCWD Complaint System
+        </v-toolbar-title>
+        <v-spacer />
+        <div class="d-flex align-center gap-3 header-right">
+          <div
+            class="text-caption text-white font-weight-medium ph-time"
+            :class="{ 'd-none d-sm-block': mobile }"
+          >
+            {{ phTime }}
           </div>
         </div>
       </div>
-      <v-spacer />
-      <!-- Live PH time - Hidden on small mobile -->
-      <div class="mr-2 mr-sm-4 text-caption ph-time" :class="{ 'd-none d-sm-flex': mobile }">
-        {{ phTime }}
-      </div>
-      <!-- Theme toggle -->
-      <!-- <v-btn icon variant="text" @click="toggleTheme" :title="'Toggle theme'" size="small">
-        <v-icon size="20">{{
-          theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'
-        }}</v-icon>
-      </v-btn> -->
-      <!-- Logout -->
-      <!-- <v-btn icon variant="text" color="white" @click="logout" :title="'Logout'" size="small">
-        <v-icon size="20">mdi-logout</v-icon>
-      </v-btn> -->
     </v-app-bar>
+
     <!-- Main -->
     <v-main
       class="pa-2 pa-sm-4 pa-md-6"
@@ -280,7 +274,7 @@ const pipeLocationOptions = [
                 </div>
                 <!-- File Upload -->
                 <div class="my-3">
-                  <label class="mb-1">Attach photos (max 4)</label>
+                  <label class="mb-1">Attach photos (max 4) </label>
                   <input type="file" accept="image/*" multiple @change="onFilesChange" />
                   <v-row class="mt-3" dense>
                     <v-col v-for="(p, i) in previews" :key="i" cols="6" sm="4" md="3">
@@ -320,101 +314,8 @@ const pipeLocationOptions = [
         </v-row>
       </v-container>
       <!-- Footer Content Inside Main (for mobile) - Outside container -->
-      <v-row v-if="mobile" class="mt-8 mx-0">
-        <v-col cols="12" class="px-0">
-          <div
-            class="footer-mobile-content"
-            :class="theme === 'light' ? 'bg-footer-light' : 'bg-footer-dark'"
-          >
-            <div class="footer-content-mobile text-center py-4">
-              <div class="mb-3">
-                <span class="text-caption font-weight-medium text-white"
-                  >&copy; 2025 BCWD Complaint System</span
-                >
-              </div>
-              <div class="footer-contacts-mobile mb-3">
-                <div class="contact-line mb-1">
-                  <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
-                  <span class="text-caption text-white"
-                    >Gov. Jose A. Rosales Ave., Butuan City</span
-                  >
-                </div>
-                <div class="contact-line mb-1">
-                  <v-icon size="12" class="mr-1 text-white">mdi-phone</v-icon>
-                  <span class="text-caption text-white">(085) 817-6635</span>
-                </div>
-                <div class="contact-line mb-1">
-                  <v-icon size="12" class="mr-1 text-white">mdi-cellphone</v-icon>
-                  <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
-                </div>
-                <div class="contact-line mb-1">
-                  <v-icon size="12" class="mr-1 text-white">mdi-email</v-icon>
-                  <span class="text-caption text-white">bcwdrecords@gmail.com</span>
-                </div>
-              </div>
-              <div>
-                <small class="text-caption font-weight-medium text-white"
-                  >Philippines (Asia/Manila)</small
-                >
-              </div>
-            </div>
-          </div>
-        </v-col>
-      </v-row>
     </v-main>
     <!-- Footer (Desktop only) -->
-    <v-footer
-      v-if="!mobile"
-      app
-      class="py-2 footer-bar"
-      height="auto"
-      :color="theme === 'light' ? '#0f5088' : '#0b1116'"
-    >
-      <v-container class="pa-0">
-        <v-row no-gutters align="center" class="footer-content px-2 px-sm-4 justify-space-between">
-          <!-- Copyright - Left -->
-          <div class="footer-section copyright d-flex align-center">
-            <span class="text-caption font-weight-medium text-white"
-              >&copy; 2025 BCWD Complaint System</span
-            >
-          </div>
-          <!-- Contact Info - Center -->
-          <div
-            class="footer-section contacts d-flex align-center justify-center flex-nowrap flex-grow-1 mx-4"
-          >
-            <!-- Address -->
-            <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
-              <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
-              <span class="text-caption text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
-            </div>
-            <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
-            <!-- Phone -->
-            <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
-              <v-icon size="12" class="mr-1 text-white">mdi-phone</v-icon>
-              <span class="text-caption text-white">(085) 817-6635</span>
-            </div>
-            <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
-            <!-- Mobile -->
-            <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
-              <v-icon size="12" class="mr-1 text-white">mdi-cellphone</v-icon>
-              <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
-            </div>
-            <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
-            <!-- Email -->
-            <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
-              <v-icon size="12" class="mr-1 text-white">mdi-email</v-icon>
-              <span class="text-caption text-white">bcwdrecords@gmail.com</span>
-            </div>
-          </div>
-          <!-- Time Zone - Right -->
-          <div class="footer-section timezone d-flex align-center">
-            <small class="text-caption font-weight-medium text-white"
-              >Philippines (Asia/Manila)</small
-            >
-          </div>
-        </v-row>
-      </v-container>
-    </v-footer>
   </v-app>
 </template>
 <style scoped>
@@ -659,5 +560,58 @@ const pipeLocationOptions = [
   .contact-line .text-caption {
     font-size: 0.55rem;
   }
+}
+/* ============================= */
+/* FULL-WIDTH HEADER DEPTH */
+/* ============================= */
+.admin-header {
+  position: relative;
+  padding: 0 !important; /* remove vuetify internal padding */
+  overflow: hidden;
+  z-index: 20;
+  /* elevation */
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.25),
+    0 6px 18px rgba(0, 0, 0, 0.18);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+/* true full-width depth layer */
+.header-depth-layer {
+  position: absolute;
+  inset: 0;
+  width: 100vw; /* force viewport width */
+  left: 50%;
+  transform: translateX(-50%); /* center it */
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.04),
+    rgba(0, 0, 0, 0.22)
+  );
+  z-index: 0;
+}
+/* content wrapper */
+.header-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+/* text depth */
+.header-title {
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  letter-spacing: 0.4px;
+}
+.header-right {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+/* dark mode tuning */
+.v-theme--dark .admin-header {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.55),
+    0 10px 28px rgba(0, 0, 0, 0.65);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 </style>

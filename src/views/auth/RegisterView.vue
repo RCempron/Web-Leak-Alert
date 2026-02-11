@@ -49,18 +49,28 @@ onUnmounted(() => {
 <template>
   <v-app>
     <!-- Glass Header -->
-    <v-app-bar flat class="glass-header" :class="theme">
-      <v-container class="d-flex align-center" fluid>
-        <div class="title">BCWD Complaint System</div>
-
+    <v-app-bar
+      flat
+      density="comfortable"
+      :color="theme === 'light' ? '#1565c0' : '#0f1720'"
+      class="admin-header"
+    >
+      <!-- FULL-WIDTH depth system -->
+      <div class="header-depth-layer"></div>
+      <div class="header-inner px-2 px-sm-6">
+        <v-toolbar-title class="font-weight-bold header-title">
+          BCWD Complaint System
+        </v-toolbar-title>
         <v-spacer />
-
-        <div class="ph-time d-none d-sm-flex">{{ phTime }}</div>
-
-        <v-btn icon variant="text" @click="toggleTheme">
-          <v-icon>{{ theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
-        </v-btn>
-      </v-container>
+        <div class="d-flex align-center gap-3 header-right">
+          <div
+            class="text-caption text-white font-weight-medium ph-time"
+            :class="{ 'd-none d-sm-block': mobile }"
+          >
+            {{ phTime }}
+          </div>
+        </div>
+      </div>
     </v-app-bar>
 
     <!-- Main -->
@@ -377,5 +387,59 @@ onUnmounted(() => {
   .login-header {
     margin-top: 8px;
   }
+}
+
+/* ============================= */
+/* FULL-WIDTH HEADER DEPTH */
+/* ============================= */
+.admin-header {
+  position: relative;
+  padding: 0 !important; /* remove vuetify internal padding */
+  overflow: hidden;
+  z-index: 20;
+  /* elevation */
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.25),
+    0 6px 18px rgba(0, 0, 0, 0.18);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+/* true full-width depth layer */
+.header-depth-layer {
+  position: absolute;
+  inset: 0;
+  width: 100vw; /* force viewport width */
+  left: 50%;
+  transform: translateX(-50%); /* center it */
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.04),
+    rgba(0, 0, 0, 0.22)
+  );
+  z-index: 0;
+}
+/* content wrapper */
+.header-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+/* text depth */
+.header-title {
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  letter-spacing: 0.4px;
+}
+.header-right {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+/* dark mode tuning */
+.v-theme--dark .admin-header {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.55),
+    0 10px 28px rgba(0, 0, 0, 0.65);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 </style>
