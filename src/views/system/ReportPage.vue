@@ -4,36 +4,28 @@ import { useRouter } from 'vue-router'
 import { useDisplay, useTheme } from 'vuetify'
 import { supabase } from '@/utils/supabase'
 import AlertNotification from '@/components/common/AlertNotification.vue'
-
 const { mobile } = useDisplay()
 const router = useRouter()
-
 // Vuetify theme helper
 const vuetifyTheme = useTheme()
-
 // Persistent theme (read from localStorage)
 const theme = ref(localStorage.getItem('theme') ?? 'light')
-
 // Apply initial theme to Vuetify (use change to avoid deprecated assignment warnings)
 vuetifyTheme.change(theme.value)
-
 // toggle theme (and persist)
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', theme.value)
   vuetifyTheme.change(theme.value)
 }
-
 // Logout function
 async function logout() {
   await supabase.auth.signOut()
   router.push('/login')
 }
-
 // -------- Philippine live date/time ----------
 const phTime = ref('')
 let timer = null
-
 function updatePhTime() {
   const now = new Date()
   phTime.value = new Intl.DateTimeFormat('en-PH', {
@@ -48,43 +40,41 @@ function updatePhTime() {
     timeZone: 'Asia/Manila',
   }).format(now)
 }
-
 onMounted(() => {
   updatePhTime()
   timer = setInterval(updatePhTime, 1000)
 })
-
 onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
-
 // Report form logic
 const refVForm = ref(null)
-
-const reportTypes = ['Broken Pipe', 'Water Leak', 'Low Pressure', 'Contamination', 'Other']
+const reportTypes = [
+  'Broken Pipe',
+  'Low Pressure',
+  'Contamination',
+  'Water Leak',
+  'No Water',
+  'Other',
+]
 const severities = ['Low', 'Medium', 'High', 'Critical']
-
 const type = ref('')
 const severity = ref('')
 const landmark = ref('')
 const notes = ref('')
 const files = ref([])
 const previews = ref([])
-
 const latitude = ref(null)
 const longitude = ref(null)
 const fetchingLocation = ref(false)
-
 const formAction = ref({
   formProcess: false,
   formErrorMessage: '',
   formSuccessMessage: '',
 })
-
 const canSubmit = computed(
   () => !!type.value && !!severity.value && (landmark.value || notes.value),
 )
-
 function onFilesChange(e) {
   const selected = Array.from(e.target.files || []).slice(0, 4)
   files.value = selected
@@ -95,12 +85,10 @@ function onFilesChange(e) {
     r.readAsDataURL(f)
   })
 }
-
 function removePreview(i) {
   previews.value.splice(i, 1)
   files.value.splice(i, 1)
 }
-
 function captureLocation() {
   if (!navigator.geolocation) {
     formAction.value.formErrorMessage = 'Geolocation not supported by this browser.'
@@ -120,19 +108,15 @@ function captureLocation() {
     { enableHighAccuracy: true, timeout: 10000 },
   )
 }
-
 async function submitReport() {
   const isValid = await refVForm.value?.validate()
   if (!isValid) return
   formAction.value.formProcess = true
-
   try {
     const { data: userData, error: userErr } = await supabase.auth.getUser()
     if (userErr || !userData.user) throw new Error('User not authenticated.')
-
     const user = userData.user
     const uploadedUrls = []
-
     for (const f of files.value) {
       const filePath = `${user.id}/${Date.now()}-${f.name}`
       const { data, error } = await supabase.storage.from('report-attachments').upload(filePath, f)
@@ -140,7 +124,6 @@ async function submitReport() {
       const { data: urlData } = supabase.storage.from('report-attachments').getPublicUrl(data.path)
       uploadedUrls.push(urlData.publicUrl)
     }
-
     const { error: insertError } = await supabase.from('reports').insert([
       {
         user_id: user.id,
@@ -155,9 +138,7 @@ async function submitReport() {
         status: 'pending',
       },
     ])
-
     if (insertError) throw insertError
-
     formAction.value.formSuccessMessage = 'Report submitted successfully!'
     setTimeout(() => router.replace('/dashboard'), 1000)
   } catch (err) {
@@ -166,10 +147,8 @@ async function submitReport() {
     formAction.value.formProcess = false
   }
 }
-
 // Pipe location
 const pipeLocation = ref(null)
-
 const pipeLocationOptions = [
   { value: 'mainline', title: 'Mainline – Large pipes along major roads' },
   { value: 'transition', title: 'Transition Line – Connects main pipes to neighborhoods' },
@@ -178,7 +157,6 @@ const pipeLocationOptions = [
   { value: 'unknown', title: 'Not sure – I am not certain' },
 ]
 </script>
-
 <template>
   <v-app :theme="theme">
     <!-- Header -->
@@ -196,27 +174,22 @@ const pipeLocationOptions = [
           </div>
         </div>
       </div>
-
       <v-spacer />
-
       <!-- Live PH time - Hidden on small mobile -->
       <div class="mr-2 mr-sm-4 text-caption ph-time" :class="{ 'd-none d-sm-flex': mobile }">
         {{ phTime }}
       </div>
-
       <!-- Theme toggle -->
-      <v-btn icon variant="text" @click="toggleTheme" :title="'Toggle theme'" size="small">
+      <!-- <v-btn icon variant="text" @click="toggleTheme" :title="'Toggle theme'" size="small">
         <v-icon size="20">{{
           theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'
         }}</v-icon>
-      </v-btn>
-
+      </v-btn> -->
       <!-- Logout -->
-      <v-btn icon variant="text" color="white" @click="logout" :title="'Logout'" size="small">
+      <!-- <v-btn icon variant="text" color="white" @click="logout" :title="'Logout'" size="small">
         <v-icon size="20">mdi-logout</v-icon>
-      </v-btn>
+      </v-btn> -->
     </v-app-bar>
-
     <!-- Main -->
     <v-main
       class="pa-2 pa-sm-4 pa-md-6"
@@ -239,24 +212,21 @@ const pipeLocationOptions = [
               <p class="text-medium-emphasis mb-4 text-center" :class="mobile ? 'text-body-2' : ''">
                 Provide details and optional photos. Capture your location for faster response.
               </p>
-
               <AlertNotification
                 :form-success-message="formAction.formSuccessMessage"
                 :form-error-message="formAction.formErrorMessage"
               />
-
               <v-form ref="refVForm">
                 <v-row>
                   <v-col cols="12" md="6">
                     <v-select
                       v-model="type"
                       :items="reportTypes"
-                      label="Type of leak"
+                      label="Type of complaint"
                       :rules="[(v) => !!v || 'Type is required']"
                       variant="outlined"
                     />
                   </v-col>
-
                   <v-col cols="12" md="6">
                     <v-select
                       v-model="severity"
@@ -267,7 +237,6 @@ const pipeLocationOptions = [
                     />
                   </v-col>
                 </v-row>
-
                 <v-row>
                   <v-col cols="12">
                     <v-select
@@ -279,12 +248,8 @@ const pipeLocationOptions = [
                       variant="outlined"
                       clearable
                     />
-                    <small class="text-caption text-medium-emphasis">
-                      Helps BCWD identify where the pipe is located. If unsure, select “Not sure”.
-                    </small>
                   </v-col>
                 </v-row>
-
                 <v-text-field
                   v-model="landmark"
                   label="Landmark / Nearest place"
@@ -298,7 +263,6 @@ const pipeLocationOptions = [
                   variant="outlined"
                   class="mb-3"
                 />
-
                 <!-- Location -->
                 <div class="my-4">
                   <div class="d-flex align-center gap-3 mb-2 flex-wrap">
@@ -314,7 +278,6 @@ const pipeLocationOptions = [
                     If geolocation fails, write the place in Landmark.
                   </small>
                 </div>
-
                 <!-- File Upload -->
                 <div class="my-3">
                   <label class="mb-1">Attach photos (max 4)</label>
@@ -333,7 +296,6 @@ const pipeLocationOptions = [
                     </v-col>
                   </v-row>
                 </div>
-
                 <!-- Actions -->
                 <div
                   class="d-flex flex-column flex-sm-row justify-space-between align-center mt-6 gap-3"
@@ -341,7 +303,6 @@ const pipeLocationOptions = [
                   <v-btn variant="outlined" size="large" @click="$router.replace('/dashboard')">
                     <v-icon start>mdi-arrow-left</v-icon> Back
                   </v-btn>
-
                   <v-btn
                     color="primary"
                     size="large"
@@ -371,7 +332,6 @@ const pipeLocationOptions = [
                   >&copy; 2025 BCWD Complaint System</span
                 >
               </div>
-
               <div class="footer-contacts-mobile mb-3">
                 <div class="contact-line mb-1">
                   <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
@@ -392,7 +352,6 @@ const pipeLocationOptions = [
                   <span class="text-caption text-white">bcwdrecords@gmail.com</span>
                 </div>
               </div>
-
               <div>
                 <small class="text-caption font-weight-medium text-white"
                   >Philippines (Asia/Manila)</small
@@ -419,7 +378,6 @@ const pipeLocationOptions = [
               >&copy; 2025 BCWD Complaint System</span
             >
           </div>
-
           <!-- Contact Info - Center -->
           <div
             class="footer-section contacts d-flex align-center justify-center flex-nowrap flex-grow-1 mx-4"
@@ -429,32 +387,25 @@ const pipeLocationOptions = [
               <v-icon size="12" class="mr-1 text-white">mdi-map-marker</v-icon>
               <span class="text-caption text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
             </div>
-
             <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
-
             <!-- Phone -->
             <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
               <v-icon size="12" class="mr-1 text-white">mdi-phone</v-icon>
               <span class="text-caption text-white">(085) 817-6635</span>
             </div>
-
             <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
-
             <!-- Mobile -->
             <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
               <v-icon size="12" class="mr-1 text-white">mdi-cellphone</v-icon>
               <span class="text-caption text-white">0918-930-4234 • 0917-188-8726</span>
             </div>
-
             <v-divider vertical thickness="1" class="mx-1 mx-sm-2 divider-item" />
-
             <!-- Email -->
             <div class="contact-item d-flex align-center gap-1 mx-1 mx-sm-2">
               <v-icon size="12" class="mr-1 text-white">mdi-email</v-icon>
               <span class="text-caption text-white">bcwdrecords@gmail.com</span>
             </div>
           </div>
-
           <!-- Time Zone - Right -->
           <div class="footer-section timezone d-flex align-center">
             <small class="text-caption font-weight-medium text-white"
@@ -466,7 +417,6 @@ const pipeLocationOptions = [
     </v-footer>
   </v-app>
 </template>
-
 <style scoped>
 .text-blue {
   color: #1976d2;
@@ -480,7 +430,6 @@ const pipeLocationOptions = [
 .bg-grey-darken-4 {
   background-color: #121212;
 }
-
 /* header tweaks */
 .header-bar {
   color: #fff;
@@ -489,14 +438,12 @@ const pipeLocationOptions = [
   opacity: 0.9;
   color: rgba(255, 255, 255, 0.9);
 }
-
 /* small styling for PH time */
 .ph-time {
   color: rgba(255, 255, 255, 0.95);
   font-weight: 500;
   white-space: nowrap;
 }
-
 /* Card styling */
 .modern-card {
   transition: all 0.3s ease;
@@ -505,33 +452,27 @@ const pipeLocationOptions = [
   transform: translateY(-5px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
-
 /* Ensure main content has enough space on mobile */
 .v-main {
   min-height: calc(100vh - 64px) !important;
 }
-
 /* Remove any potential white gaps */
 .v-application .v-main {
   padding-bottom: 0 !important;
 }
-
 .v-container {
   padding-bottom: 0 !important;
 }
-
 /* Add this to your style section */
 .v-container {
   max-width: 100% !important;
 }
-
 @media (min-width: 600px) {
   .v-container {
     padding-left: 24px !important;
     padding-right: 24px !important;
   }
 }
-
 /* Footer background colors */
 .bg-footer-light {
   background-color: #0f5088;
@@ -539,7 +480,6 @@ const pipeLocationOptions = [
 .bg-footer-dark {
   background-color: #0b1116;
 }
-
 /* footer tweaks */
 .footer-bar {
   color: #fff;
@@ -549,38 +489,31 @@ const pipeLocationOptions = [
   text-decoration: none;
   font-size: 0.875rem;
 }
-
 /* Footer responsive styles */
 .footer-content {
   flex-wrap: nowrap;
   min-height: 52px;
 }
-
 .footer-section .text-caption {
   font-size: 0.75rem;
   white-space: nowrap;
 }
-
 .contacts {
   gap: 0;
 }
-
 .contact-item,
 .divider-item {
   transition: all 0.3s ease;
 }
-
 .divider-item {
   opacity: 0.3;
 }
-
 /* Ensure consistent spacing on all screen sizes */
 @media (max-width: 1279px) {
   .footer-section .text-caption {
     font-size: 0.7rem;
   }
 }
-
 @media (max-width: 959px) {
   .footer-content {
     flex-wrap: wrap !important;
@@ -588,73 +521,60 @@ const pipeLocationOptions = [
     gap: 0.5rem;
     padding: 0.5rem 0;
   }
-
   .contacts {
     order: 1;
     flex: 1 1 100%;
     justify-content: center;
     margin: 0.5rem 0;
   }
-
   .copyright {
     order: 2;
   }
-
   .timezone {
     order: 3;
   }
 }
-
 @media (max-width: 767px) {
   .contacts {
     flex-wrap: wrap;
     gap: 0.5rem;
   }
-
   .contact-item {
     flex: 1 1 calc(50% - 1rem);
     justify-content: center;
     min-width: 140px;
   }
-
   .divider-item {
     display: none;
   }
 }
-
 /* Mobile footer inside main */
 .footer-mobile-content {
   width: 100%;
 }
-
 .footer-content-mobile {
   color: white;
 }
-
 .footer-contacts-mobile {
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-
 .contact-line {
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 /* Ensure white text colors */
 .text-white {
   color: white !important;
 }
-
 /* Mobile responsiveness */
 @media (max-width: 1279px) {
   .footer-section .text-caption {
     font-size: 0.7rem;
   }
 }
-
 @media (max-width: 959px) {
   .footer-content {
     flex-wrap: wrap !important;
@@ -662,101 +582,80 @@ const pipeLocationOptions = [
     gap: 0.5rem;
     padding: 0.5rem 0;
   }
-
   .footer-section {
     justify-content: center !important;
     flex: 1 1 100%;
   }
-
   .contacts {
     order: 1;
     gap: 0.75rem;
   }
-
   .copyright {
     order: 2;
   }
-
   .timezone {
     order: 3;
   }
-
   .footer-section .text-caption {
     font-size: 0.65rem;
   }
-
   .contact-item .v-icon {
     margin-right: 2px !important;
   }
 }
-
 @media (max-width: 767px) {
   .contacts {
     flex-wrap: wrap;
     gap: 0.5rem;
   }
-
   .contact-item {
     flex: 1 1 calc(50% - 1rem);
     justify-content: center;
     min-width: 140px;
   }
-
   .divider-item {
     display: none;
   }
-
   .footer-section .text-caption {
     font-size: 0.6rem;
   }
-
   .footer-content-mobile .text-caption {
     font-size: 0.75rem;
   }
 }
-
 @media (max-width: 599px) {
   .footer-content-mobile .text-caption {
     font-size: 0.7rem;
   }
-
   .contact-line .text-caption {
     font-size: 0.65rem;
   }
 }
-
 @media (max-width: 420px) {
   .footer-content {
     gap: 0.25rem;
   }
-
   .footer-section .text-caption {
     font-size: 0.5rem;
   }
-
   .footer-content-mobile .text-caption {
     font-size: 0.65rem;
   }
-
   .contact-line .text-caption {
     font-size: 0.6rem;
   }
-
   .contact-item .v-icon {
     font-size: 10px !important;
   }
 }
-
 /* Very small screens */
 @media (max-width: 360px) {
   .footer-bar {
     min-height: 48px;
   }
-
   .footer-content-mobile .text-caption {
     font-size: 0.6rem;
   }
-
   .contact-line .text-caption {
     font-size: 0.55rem;
   }

@@ -13,13 +13,11 @@ const vuetifyTheme = useTheme()
 // ── Theme ───────────────────────────────────────────────
 const theme = ref(localStorage.getItem('theme') ?? 'light')
 vuetifyTheme.change(theme.value)
-
 watch(theme, (newTheme) => {
   localStorage.setItem('theme', newTheme)
   vuetifyTheme.change(newTheme)
   showSnackbar('Theme changed')
 })
-
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
 }
@@ -28,13 +26,11 @@ function toggleTheme() {
 const phTime = ref('')
 let timer = null
 const timeFormat = ref(localStorage.getItem('timeFormat') || '24')
-
 watch(timeFormat, (val) => {
   localStorage.setItem('timeFormat', val)
   updatePhTime()
   showSnackbar('Time format changed')
 })
-
 function updatePhTime() {
   const now = new Date()
   phTime.value = new Intl.DateTimeFormat('en-PH', {
@@ -49,12 +45,10 @@ function updatePhTime() {
     timeZone: 'Asia/Manila',
   }).format(now)
 }
-
 onMounted(() => {
   updatePhTime()
   timer = setInterval(updatePhTime, 1000)
 })
-
 onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
@@ -63,7 +57,6 @@ onUnmounted(() => {
 const updatedReports = ref(new Set())
 const lastViewedUpdates = ref(JSON.parse(localStorage.getItem('lastViewedUpdates') || '{}'))
 const notificationCount = computed(() => updatedReports.value.size)
-const hasNotifications = computed(() => notificationCount.value > 0)
 const showUpdatedOnly = ref(false)
 
 function showUpdatedReports() {
@@ -73,7 +66,6 @@ function showUpdatedReports() {
   selectedType.value = 'all'
   page.value = 1
 }
-
 function resetToAllReports() {
   showUpdatedOnly.value = false
   currentStatus.value = 'all'
@@ -82,7 +74,6 @@ function resetToAllReports() {
 }
 
 const reports = ref([])
-
 async function fetchReports() {
   const { data: userData } = await supabase.auth.getUser()
   if (!userData?.user) return
@@ -127,9 +118,8 @@ const selectedType = ref('all')
 
 const filteredReports = computed(() => {
   let filtered = baseReportsForFiltering.value
-  if (currentStatus.value !== 'all') {
+  if (currentStatus.value !== 'all')
     filtered = filtered.filter((r) => r.status === currentStatus.value)
-  }
   if (selectedType.value && selectedType.value !== 'all') {
     filtered = filtered.filter((r) => (r.type || 'other').toLowerCase() === selectedType.value)
   }
@@ -138,7 +128,6 @@ const filteredReports = computed(() => {
 
 const page = ref(1)
 const itemsPerPage = ref(parseInt(localStorage.getItem('itemsPerPage')) || 10)
-
 watch(itemsPerPage, (val) => {
   localStorage.setItem('itemsPerPage', val.toString())
   showSnackbar('Items per page changed')
@@ -154,12 +143,14 @@ const paginationLength = computed(() =>
   Math.ceil(filteredReports.value.length / itemsPerPage.value),
 )
 
+// ── UPDATED ICONS (water leak & broken pipe now different) ───────
 const typeIcons = {
   'low pressure': 'mdi-water',
-  'broken pipe': 'mdi-pipe-leak',
+  'broken pipe': 'mdi-pipe-disconnected', // ← clear broken pipe
   'dark colored water': 'mdi-water-alert',
   contamination: 'mdi-water-alert',
-  'water leak': 'mdi-pipe-leak',
+  'water leak': 'mdi-pipe-leak', // ← classic leaking pipe
+  'no water': 'mdi-water-off',
   other: 'mdi-help-circle',
 }
 
@@ -169,6 +160,7 @@ const typeColors = {
   'dark colored water': 'orange',
   contamination: 'orange',
   'water leak': 'red',
+  'no water': 'red',
   other: 'grey',
 }
 
@@ -192,7 +184,6 @@ async function fetchUser() {
 // ── Report Dialog & Image Viewer ────────────────────────
 const dialog = ref(false)
 const selectedReport = ref(null)
-
 function openReportDetails(report) {
   selectedReport.value = report
   dialog.value = true
@@ -204,21 +195,17 @@ function openReportDetails(report) {
 const showImageViewer = ref(false)
 const activeImage = ref('')
 const zoomLevel = ref(1)
-
 function openImageViewer(img) {
   activeImage.value = img
   zoomLevel.value = 1
   showImageViewer.value = true
 }
-
 function zoomIn() {
   zoomLevel.value = Math.min(zoomLevel.value + 0.25, 3)
 }
-
 function zoomOut() {
   zoomLevel.value = Math.max(zoomLevel.value - 0.25, 0.5)
 }
-
 function resetZoom() {
   zoomLevel.value = 1
 }
@@ -226,15 +213,10 @@ function resetZoom() {
 // ── Sidebar ─────────────────────────────────────────────
 const drawer = ref(!mobile.value)
 const rail = ref(false)
-
 function toggleSidebar() {
-  if (mobile.value) {
-    drawer.value = !drawer.value
-  } else {
-    rail.value = !rail.value
-  }
+  if (mobile.value) drawer.value = !drawer.value
+  else rail.value = !rail.value
 }
-
 watch(mobile, (isMobile) => {
   if (isMobile) {
     drawer.value = false
@@ -257,7 +239,6 @@ async function loadData() {
   })
   updatedReports.value = new Set(updated.map((r) => r.id))
 }
-
 onMounted(loadData)
 onActivated(loadData)
 
@@ -286,7 +267,6 @@ async function loadCurrentUser() {
     age.value = user.value?.user_metadata?.age || ''
     residency.value = user.value?.user_metadata?.residency || ''
   } catch (err) {
-    console.error('Failed to load user', err)
     formErrorMessage.value = err?.message || String(err)
   } finally {
     loading.value = false
@@ -316,7 +296,6 @@ async function saveProfile() {
     editing.value = false
     await fetchUser()
   } catch (err) {
-    console.error('Update failed', err)
     formErrorMessage.value = err?.message || String(err)
   } finally {
     saving.value = false
@@ -329,25 +308,44 @@ onMounted(loadCurrentUser)
 // ── Snackbar ────────────────────────────────────────────
 const snackbar = ref(false)
 const snackbarMessage = ref('')
-
 function showSnackbar(message) {
   snackbarMessage.value = message
   snackbar.value = true
 }
-
 async function logout() {
   await supabase.auth.signOut()
   router.push('/login')
 }
-
 function handleMobileNav(view) {
   currentView.value = view
-
-  // auto-close drawer ONLY on mobile
-  if (mobile.value) {
-    drawer.value = false
-  }
+  if (mobile.value) drawer.value = false
 }
+
+// ── Avatar ──────────────────────────────────────────────
+const colors = [
+  'red',
+  'pink',
+  'purple',
+  'deep-purple',
+  'indigo',
+  'blue',
+  'light-blue',
+  'cyan',
+  'teal',
+  'green',
+  'light-green',
+  'lime',
+  'yellow',
+  'amber',
+  'orange',
+  'deep-orange',
+]
+const initial = computed(() => userName.value.charAt(0).toUpperCase() || 'U')
+const avatarColor = computed(() => {
+  if (!userName.value) return 'grey'
+  const index = Math.abs(userName.value.charCodeAt(0)) % colors.length
+  return colors[index]
+})
 </script>
 
 <template>
@@ -359,17 +357,12 @@ function handleMobileNav(view) {
       :color="theme === 'light' ? '#1565c0' : '#0f1720'"
       class="consumer-header"
     >
-      <!-- FULL-WIDTH depth layer -->
       <div class="consumer-header-depth"></div>
-
-      <!-- header content wrapper -->
       <div class="consumer-header-inner px-2 px-sm-6">
-        <v-toolbar-title class="font-weight-bold consumer-header-title">
-          BCWD Complaint System
-        </v-toolbar-title>
-
+        <v-toolbar-title class="font-weight-bold consumer-header-title"
+          >BCWD Complaint System</v-toolbar-title
+        >
         <v-spacer />
-
         <div class="d-flex align-center gap-3 consumer-header-right">
           <div
             class="text-caption text-white font-weight-medium ph-time"
@@ -394,48 +387,37 @@ function handleMobileNav(view) {
           class="sidebar-profile pa-5 d-flex flex-column align-center"
           :class="{ 'd-none': !mobile && rail }"
         >
-          <v-avatar size="80" class="mb-4 elevation-6 profile-avatar" color="grey-lighten-4">
-            <v-icon size="48" color="primary">mdi-account-circle</v-icon>
+          <v-avatar :color="avatarColor" size="80" class="mb-4 elevation-6 profile-avatar">
+            <span class="text-h5 white--text">{{ initial }}</span>
           </v-avatar>
           <div class="admin-info text-center">
             <div class="admin-name text-h6 font-weight-medium mb-1">{{ userName }}</div>
             <div class="admin-role text-caption opacity-70">Consumer</div>
           </div>
         </div>
-
         <v-divider class="my-3 mx-4" :class="{ 'mt-6': !mobile && rail }" />
-
         <v-list-item
           :active="currentView === 'dashboard'"
           prepend-icon="mdi-view-dashboard"
           title="Dashboard"
-          class="mb-1"
           @click="handleMobileNav('dashboard')"
         />
-
         <v-list-item
           :active="currentView === 'profile'"
           prepend-icon="mdi-account-circle"
           title="Profile"
-          class="mb-1"
           @click="handleMobileNav('profile')"
         />
-
         <v-list-item
           :active="currentView === 'settings'"
           prepend-icon="mdi-cog"
           title="Settings"
-          class="mb-1"
           @click="handleMobileNav('settings')"
         />
-
         <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout" class="mt-8" />
       </v-list>
-
       <div class="sidebar-lump" @click="toggleSidebar">
-        <v-icon size="22">
-          {{ drawer ? 'mdi-chevron-left' : 'mdi-chevron-right' }}
-        </v-icon>
+        <v-icon size="22">{{ drawer ? 'mdi-chevron-left' : 'mdi-chevron-right' }}</v-icon>
       </div>
     </v-navigation-drawer>
 
@@ -451,7 +433,7 @@ function handleMobileNav(view) {
           </p>
         </div>
 
-        <!-- Dashboard View -->
+        <!-- Dashboard -->
         <div v-if="currentView === 'dashboard'">
           <v-card rounded="lg" elevation="2" class="position-relative">
             <v-card-title class="d-flex align-center justify-space-between py-4 px-6">
@@ -472,7 +454,6 @@ function handleMobileNav(view) {
                   <v-icon v-else size="24">mdi-bell-ring</v-icon>
                 </v-btn>
                 <v-btn
-                  v-if="!showUpdatedOnly"
                   color="primary"
                   prepend-icon="mdi-plus"
                   variant="flat"
@@ -503,9 +484,8 @@ function handleMobileNav(view) {
                   prepend-icon="mdi-arrow-left"
                   variant="flat"
                   @click="resetToAllReports"
+                  >Go back to all reports</v-btn
                 >
-                  Go back to all reports
-                </v-btn>
               </div>
             </v-alert>
 
@@ -516,29 +496,28 @@ function handleMobileNav(view) {
                   :color="theme === 'light' ? 'primary' : 'blue-darken-2'"
                   variant="flat"
                   size="large"
+                  >All <strong class="ml-1">{{ statusCounts.all }}</strong></v-chip
                 >
-                  All <strong class="ml-1">{{ statusCounts.all }}</strong>
-                </v-chip>
-                <v-chip value="pending" color="amber" variant="flat" size="large">
-                  Pending <strong class="ml-1">{{ statusCounts.pending }}</strong>
-                </v-chip>
-                <v-chip value="ongoing" color="blue" variant="flat" size="large">
-                  Ongoing <strong class="ml-1">{{ statusCounts.ongoing }}</strong>
-                </v-chip>
-                <v-chip value="resolved" color="green" variant="flat" size="large">
-                  Resolved <strong class="ml-1">{{ statusCounts.resolved }}</strong>
-                </v-chip>
-                <v-chip value="rejected" color="red" variant="flat" size="large">
-                  Rejected <strong class="ml-1">{{ statusCounts.rejected }}</strong>
-                </v-chip>
+                <v-chip value="pending" color="amber" variant="flat" size="large"
+                  >Pending <strong class="ml-1">{{ statusCounts.pending }}</strong></v-chip
+                >
+                <v-chip value="ongoing" color="blue" variant="flat" size="large"
+                  >Ongoing <strong class="ml-1">{{ statusCounts.ongoing }}</strong></v-chip
+                >
+                <v-chip value="resolved" color="green" variant="flat" size="large"
+                  >Resolved <strong class="ml-1">{{ statusCounts.resolved }}</strong></v-chip
+                >
+                <v-chip value="rejected" color="red" variant="flat" size="large"
+                  >Rejected <strong class="ml-1">{{ statusCounts.rejected }}</strong></v-chip
+                >
               </v-chip-group>
 
               <div v-if="!showUpdatedOnly" class="mb-6">
                 <div class="text-subtitle-1 mb-2">Filter by Type</div>
                 <v-chip-group v-model="selectedType" class="d-flex flex-wrap">
-                  <v-chip value="all" :variant="selectedType === 'all' ? 'flat' : 'outlined'">
-                    All Reports ({{ baseReportsForFiltering.length }})
-                  </v-chip>
+                  <v-chip value="all" :variant="selectedType === 'all' ? 'flat' : 'outlined'"
+                    >All Reports ({{ baseReportsForFiltering.length }})</v-chip
+                  >
                   <v-chip
                     v-for="(count, type) in typeCounts"
                     :key="type"
@@ -571,9 +550,9 @@ function handleMobileNav(view) {
                           {{ typeIcons[(report.type || 'other').toLowerCase()] }}
                         </v-icon>
                       </template>
-                      <v-list-item-title class="font-weight-medium">
-                        {{ report.type || 'Other' }}
-                      </v-list-item-title>
+                      <v-list-item-title class="font-weight-medium">{{
+                        report.type || 'Other'
+                      }}</v-list-item-title>
                       <v-list-item-subtitle class="mt-1">
                         <div class="text-caption mt-1">
                           Reported: {{ new Date(report.created_at).toLocaleDateString('en-PH') }}
@@ -588,15 +567,13 @@ function handleMobileNav(view) {
                             size="small"
                             prepend-icon="mdi-update"
                             class="mr-2"
+                            >Status Updated</v-chip
                           >
-                            Status Updated
-                          </v-chip>
                         </div>
                       </template>
                     </v-list-item>
                     <v-divider />
                   </v-card>
-
                   <div v-if="filteredReports.length === 0" class="text-center py-8">
                     <v-icon size="64" color="grey-lighten-1">mdi-inbox-outline</v-icon>
                     <div class="text-h6 mt-4">No reports found</div>
@@ -626,9 +603,9 @@ function handleMobileNav(view) {
             rounded="xl"
             max-width="700"
           >
-            <v-avatar size="90" class="mb-4">
-              <v-icon size="90" color="primary">mdi-account-circle</v-icon>
-            </v-avatar>
+            <v-avatar :color="avatarColor" size="90" class="mb-4"
+              ><span class="text-h4 white--text">{{ initial }}</span></v-avatar
+            >
             <h2 class="font-weight-bold mb-2" :class="mobile ? 'text-h6' : ''">My Profile</h2>
             <p class="text-medium-emphasis mb-6" :class="mobile ? 'text-body-2' : ''">
               View or edit your personal information
@@ -687,9 +664,8 @@ function handleMobileNav(view) {
                   size="large"
                   class="flex-btn"
                   @click="editing = true"
+                  ><v-icon start>mdi-account-edit</v-icon> Edit Profile</v-btn
                 >
-                  <v-icon start>mdi-account-edit</v-icon> Edit Profile
-                </v-btn>
                 <v-btn
                   v-else
                   color="success"
@@ -697,21 +673,19 @@ function handleMobileNav(view) {
                   class="flex-btn"
                   :loading="saving"
                   @click="saveProfile"
+                  ><v-icon start>mdi-content-save</v-icon> Save Changes</v-btn
                 >
-                  <v-icon start>mdi-content-save</v-icon> Save Changes
-                </v-btn>
-                <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'">
-                  <v-icon start>mdi-arrow-left</v-icon> Back
-                </v-btn>
+                <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'"
+                  ><v-icon start>mdi-arrow-left</v-icon> Back</v-btn
+                >
                 <v-btn
                   color="error"
                   variant="outlined"
                   size="large"
                   class="flex-btn"
                   @click="logout"
+                  ><v-icon start>mdi-logout</v-icon> Logout</v-btn
                 >
-                  <v-icon start>mdi-logout</v-icon> Logout
-                </v-btn>
               </div>
             </div>
           </v-card>
@@ -726,9 +700,9 @@ function handleMobileNav(view) {
             rounded="xl"
             max-width="700"
           >
-            <v-avatar size="90" class="mb-4">
-              <v-icon size="90" color="primary">mdi-cog</v-icon>
-            </v-avatar>
+            <v-avatar size="90" class="mb-4"
+              ><v-icon size="90" color="primary">mdi-cog</v-icon></v-avatar
+            >
             <h2 class="font-weight-bold mb-2" :class="mobile ? 'text-h6' : ''">Settings</h2>
             <p class="text-medium-emphasis mb-6" :class="mobile ? 'text-body-2' : ''">
               Manage your application settings
@@ -736,9 +710,9 @@ function handleMobileNav(view) {
             <v-divider class="mb-4" />
             <v-list lines="one" class="pa-0">
               <v-list-group value="appearance">
-                <template v-slot:activator="{ props }">
-                  <v-list-item v-bind="props" prepend-icon="mdi-palette" title="Appearance" />
-                </template>
+                <template v-slot:activator="{ props }"
+                  ><v-list-item v-bind="props" prepend-icon="mdi-palette" title="Appearance"
+                /></template>
                 <v-list-item title="Theme" prepend-icon="mdi-theme-light-dark">
                   <template v-slot:append>
                     <v-select
@@ -755,15 +729,13 @@ function handleMobileNav(view) {
                   </template>
                 </v-list-item>
               </v-list-group>
-
               <v-list-group value="time-display">
-                <template v-slot:activator="{ props }">
-                  <v-list-item
+                <template v-slot:activator="{ props }"
+                  ><v-list-item
                     v-bind="props"
                     prepend-icon="mdi-clock-outline"
                     title="Time Display"
-                  />
-                </template>
+                /></template>
                 <v-list-item title="Time Format" prepend-icon="mdi-clock-time-twelve-outline">
                   <template v-slot:append>
                     <v-select
@@ -780,15 +752,13 @@ function handleMobileNav(view) {
                   </template>
                 </v-list-item>
               </v-list-group>
-
               <v-list-group value="reports">
-                <template v-slot:activator="{ props }">
-                  <v-list-item
+                <template v-slot:activator="{ props }"
+                  ><v-list-item
                     v-bind="props"
                     prepend-icon="mdi-file-document-multiple"
                     title="Reports"
-                  />
-                </template>
+                /></template>
                 <v-list-item title="Items per Page" prepend-icon="mdi-view-list">
                   <template v-slot:append>
                     <v-select
@@ -803,11 +773,10 @@ function handleMobileNav(view) {
                 </v-list-item>
               </v-list-group>
             </v-list>
-
             <div class="button-group d-flex flex-wrap justify-center align-center mt-6">
-              <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'">
-                <v-icon start>mdi-arrow-left</v-icon> Back
-              </v-btn>
+              <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'"
+                ><v-icon start>mdi-arrow-left</v-icon> Back</v-btn
+              >
             </div>
           </v-card>
         </div>
@@ -829,20 +798,20 @@ function handleMobileNav(view) {
             </div>
             <div class="footer-contacts-mobile mb-4">
               <div class="contact-line mb-2">
-                <v-icon size="16" class="mr-2 text-white">mdi-map-marker</v-icon>
-                <span class="text-body-2 text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
+                <v-icon size="16" class="mr-2 text-white">mdi-map-marker</v-icon
+                ><span class="text-body-2 text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
               </div>
               <div class="contact-line mb-2">
-                <v-icon size="16" class="mr-2 text-white">mdi-phone</v-icon>
-                <span class="text-body-2 text-white">(085) 817-6635</span>
+                <v-icon size="16" class="mr-2 text-white">mdi-phone</v-icon
+                ><span class="text-body-2 text-white">(085) 817-6635</span>
               </div>
               <div class="contact-line mb-2">
-                <v-icon size="16" class="mr-2 text-white">mdi-cellphone</v-icon>
-                <span class="text-body-2 text-white">0918-930-4234 • 0917-188-8726</span>
+                <v-icon size="16" class="mr-2 text-white">mdi-cellphone</v-icon
+                ><span class="text-body-2 text-white">0918-930-4234 • 0917-188-8726</span>
               </div>
               <div class="contact-line mb-2">
-                <v-icon size="16" class="mr-2 text-white">mdi-email</v-icon>
-                <span class="text-body-2 text-white">bcwdrecords@gmail.com</span>
+                <v-icon size="16" class="mr-2 text-white">mdi-email</v-icon
+                ><span class="text-body-2 text-white">bcwdrecords@gmail.com</span>
               </div>
             </div>
             <div>
@@ -858,12 +827,12 @@ function handleMobileNav(view) {
     <!-- Desktop Footer -->
     <v-footer
       v-if="!mobile"
-      class="py-6 footer-bar"
+      class="py-6 footer-bar consumer-footer"
       :color="theme === 'light' ? '#1565c0' : '#0f1720'"
     >
       <v-container class="pa-0">
         <v-row no-gutters align="center" class="footer-content px-2 px-sm-4 justify-space-between">
-          <div class="footer-section copyright d-flex align-center mb-4 mb-md-0">
+          <div class="consumer-footer-depth copyright d-flex align-center mb-4 mb-md-0">
             <span class="text-body-2 font-weight-medium text-white"
               >&copy; 2025 BCWD Complaint System</span
             >
@@ -872,20 +841,20 @@ function handleMobileNav(view) {
             class="footer-section contacts d-flex flex-column align-center justify-center flex-grow-1 mx-4"
           >
             <div class="contact-item d-flex align-center gap-2 mb-2">
-              <v-icon size="16" class="text-white">mdi-map-marker</v-icon>
-              <span class="text-body-2 text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
+              <v-icon size="16" class="text-white">mdi-map-marker</v-icon
+              ><span class="text-body-2 text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
             </div>
             <div class="contact-item d-flex align-center gap-2 mb-2">
-              <v-icon size="16" class="text-white">mdi-phone</v-icon>
-              <span class="text-body-2 text-white">(085) 817-6635</span>
+              <v-icon size="16" class="text-white">mdi-phone</v-icon
+              ><span class="text-body-2 text-white">(085) 817-6635</span>
             </div>
             <div class="contact-item d-flex align-center gap-2 mb-2">
-              <v-icon size="16" class="text-white">mdi-cellphone</v-icon>
-              <span class="text-body-2 text-white">0918-930-4234 • 0917-188-8726</span>
+              <v-icon size="16" class="text-white">mdi-cellphone</v-icon
+              ><span class="text-body-2 text-white">0918-930-4234 • 0917-188-8726</span>
             </div>
             <div class="contact-item d-flex align-center gap-2 mb-2">
-              <v-icon size="16" class="text-white">mdi-email</v-icon>
-              <span class="text-body-2 text-white">bcwdrecords@gmail.com</span>
+              <v-icon size="16" class="text-white">mdi-email</v-icon
+              ><span class="text-body-2 text-white">bcwdrecords@gmail.com</span>
             </div>
           </div>
           <div class="footer-section timezone d-flex align-center mt-4 mt-md-0">
@@ -903,9 +872,9 @@ function handleMobileNav(view) {
         <v-card-title class="d-flex align-center pa-0 mb-4">
           <span class="text-h6 font-weight-bold">{{ selectedReport.type || 'Other' }}</span>
           <v-spacer />
-          <v-chip :color="statusColors[selectedReport.status]" variant="outlined" size="small">
-            {{ (selectedReport.status || 'pending').toUpperCase() }}
-          </v-chip>
+          <v-chip :color="statusColors[selectedReport.status]" variant="outlined" size="small">{{
+            (selectedReport.status || 'pending').toUpperCase()
+          }}</v-chip>
         </v-card-title>
         <v-card-text class="pa-0">
           <p class="mb-2">Severity: {{ selectedReport.severity || 'N/A' }}</p>
@@ -942,10 +911,10 @@ function handleMobileNav(view) {
             </v-col>
           </v-row>
         </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="primary" text @click="dialog = false">Close</v-btn>
-        </v-card-actions>
+        <v-card-actions
+          ><v-spacer></v-spacer
+          ><v-btn color="primary" text @click="dialog = false">Close</v-btn></v-card-actions
+        >
       </v-card>
     </v-dialog>
 
@@ -973,13 +942,14 @@ function handleMobileNav(view) {
     </v-dialog>
 
     <!-- Snackbar -->
-    <v-snackbar v-model="snackbar" timeout="2000" color="success" location="bottom">
-      {{ snackbarMessage }}
-    </v-snackbar>
+    <v-snackbar v-model="snackbar" timeout="2000" color="success" location="bottom">{{
+      snackbarMessage
+    }}</v-snackbar>
   </v-app>
 </template>
 
 <style scoped>
+/* Your original styles (unchanged) */
 .ph-time {
   opacity: 0.9;
 }
@@ -1025,7 +995,6 @@ function handleMobileNav(view) {
 }
 .profile-avatar {
   border: 3px solid rgba(255, 255, 255, 0.2);
-  background-color: white !important;
   transition: all 0.25s ease;
 }
 .profile-avatar:hover {
@@ -1079,12 +1048,10 @@ function handleMobileNav(view) {
     padding-left: 8px !important;
     padding-right: 8px !important;
   }
+  .v-container {
+    max-width: 100% !important;
+  }
 }
-
-.v-container {
-  max-width: 100% !important;
-}
-
 /* Sidebar lump */
 .sidebar-lump {
   position: absolute;
@@ -1104,47 +1071,33 @@ function handleMobileNav(view) {
   box-shadow: 3px 0 12px rgba(0, 0, 0, 0.35);
   transition: all 0.2s ease;
 }
-
 .v-theme--dark .sidebar-lump {
   background-color: #0f1720;
 }
-
 .sidebar-lump:hover {
   background-color: #1976d2;
   transform: translateY(-50%) scale(1.08);
 }
-
 .v-theme--dark .sidebar-lump:hover {
   background-color: #1e293b;
 }
-
 .v-navigation-drawer--rail .sidebar-lump {
   right: -32px;
 }
-
 .footer-mobile-content {
   width: 100%;
 }
-
-/* ============================= */
-/* CONSUMER HEADER DEPTH SYSTEM */
-/* ============================= */
-
+/* Consumer header depth */
 .consumer-header {
   position: relative;
   padding: 0 !important;
   overflow: hidden;
   z-index: 30;
-
-  /* elevation */
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.25),
     0 6px 18px rgba(0, 0, 0, 0.18);
-
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-
-/* full-width depth layer */
 .consumer-header-depth {
   position: absolute;
   inset: 0;
@@ -1153,7 +1106,6 @@ function handleMobileNav(view) {
   transform: translateX(-50%);
   pointer-events: none;
   z-index: 0;
-
   background: linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0.14),
@@ -1161,8 +1113,6 @@ function handleMobileNav(view) {
     rgba(0, 0, 0, 0.22)
   );
 }
-
-/* content wrapper */
 .consumer-header-inner {
   position: relative;
   z-index: 2;
@@ -1170,24 +1120,97 @@ function handleMobileNav(view) {
   align-items: center;
   width: 100%;
 }
-
-/* title depth */
 .consumer-header-title {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
   letter-spacing: 0.4px;
 }
-
-/* right side depth */
 .consumer-header-right {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
-
-/* dark mode tuning */
 .v-theme--dark .consumer-header {
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.55),
     0 10px 28px rgba(0, 0, 0, 0.65);
-
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+/* Mobile fixes */
+@media (max-width: 600px) {
+  .consumer-header-inner {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  .consumer-header-title {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    line-height: 1.2;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    max-width: 100% !important;
+    text-align: left;
+  }
+  .v-toolbar-title {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    max-width: 100% !important;
+  }
+  .v-card-title {
+    padding: 12px 14px !important;
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+  .v-card-title .text-h6 {
+    font-size: 1rem !important;
+  }
+  .v-card-title > div:last-child {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .v-card-title .v-btn[icon] {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+  }
+  .v-card-title .v-btn[color='primary'] {
+    flex: 1;
+    font-size: 0.75rem !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 12px !important;
+  }
+  .v-btn--size-large {
+    font-size: 0.75rem !important;
+    height: 40px !important;
+    min-height: 40px !important;
+  }
+  .v-chip {
+    font-size: 0.65rem !important;
+    height: 28px !important;
+    padding: 0 8px !important;
+  }
+  .v-pagination {
+    transform: scale(0.9);
+  }
+  .v-list-item {
+    padding: 10px !important;
+  }
+  .v-list-item-title {
+    font-size: 0.85rem !important;
+  }
+  .v-list-item-subtitle {
+    font-size: 0.7rem !important;
+  }
+  .v-list-item .v-icon {
+    font-size: 32px !important;
+  }
+  .v-chip[size='small'] {
+    font-size: 0.6rem !important;
+    height: 22px !important;
+  }
 }
 </style>

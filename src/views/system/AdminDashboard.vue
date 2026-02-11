@@ -4,31 +4,25 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDisplay, useTheme } from 'vuetify'
 import { supabase } from '@/utils/supabase'
-
 const { mobile } = useDisplay()
 const router = useRouter()
 const vuetifyTheme = useTheme()
-
 // ── Theme ───────────────────────────────────────────────
 const theme = ref(localStorage.getItem('theme') ?? 'light')
 vuetifyTheme.change(theme.value)
-
 // Watch theme changes (covers both toggle and settings select)
 watch(theme, (newTheme) => {
   localStorage.setItem('theme', newTheme)
   vuetifyTheme.change(newTheme)
 })
-
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   showSnackbar('Theme changed')
 }
-
 // ── Real-time PH Time ───────────────────────────────────
 const phTime = ref('')
 const timeFormat = ref(localStorage.getItem('timeFormat') || '24')
 let timer = null
-
 function updatePhTime() {
   const now = new Date()
   phTime.value = new Intl.DateTimeFormat('en-PH', {
@@ -43,26 +37,21 @@ function updatePhTime() {
     timeZone: 'Asia/Manila',
   }).format(now)
 }
-
 watch(timeFormat, (val) => {
   localStorage.setItem('timeFormat', val)
   updatePhTime()
   showSnackbar('Time format changed')
 })
-
 onMounted(() => {
   updatePhTime()
   timer = setInterval(updatePhTime, 1000)
 })
-
 onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
-
 // ── Sidebar ─────────────────────────────────────────────
 const drawer = ref(!mobile.value)
 const rail = ref(false)
-
 function toggleSidebar() {
   if (mobile.value) {
     drawer.value = !drawer.value
@@ -70,7 +59,6 @@ function toggleSidebar() {
     rail.value = !rail.value
   }
 }
-
 watch(mobile, (isMobile) => {
   if (isMobile) {
     drawer.value = false
@@ -80,27 +68,21 @@ watch(mobile, (isMobile) => {
     rail.value = false
   }
 })
-
 // ── View State ──────────────────────────────────────────
 const currentView = ref('dashboard')
-
 // ── Settings ────────────────────────────────────────────
 const itemsPerPage = ref(parseInt(localStorage.getItem('adminItemsPerPage')) || 10)
-
 watch(itemsPerPage, (val) => {
   localStorage.setItem('adminItemsPerPage', val.toString())
   showSnackbar('Items per page changed')
 })
-
 // ── Snackbar ────────────────────────────────────────────
 const snackbar = ref(false)
 const snackbarMessage = ref('')
-
 function showSnackbar(message) {
   snackbarMessage.value = message
   snackbar.value = true
 }
-
 // ── Reports Data & Filtering ────────────────────────────
 const reports = ref([])
 const loading = ref(true)
@@ -108,7 +90,6 @@ const errorMessage = ref('')
 const search = ref('')
 const selectedStatus = ref('All')
 const statuses = ['All', 'New', 'Pending', 'Ongoing', 'Resolved', 'Rejected']
-
 const statusColors = {
   All: 'grey',
   New: 'error',
@@ -117,10 +98,8 @@ const statusColors = {
   Resolved: 'success',
   Rejected: 'error',
 }
-
 const filteredReports = computed(() => {
   let list = reports.value
-
   if (search.value.trim()) {
     const term = search.value.toLowerCase()
     list = list.filter(
@@ -130,43 +109,34 @@ const filteredReports = computed(() => {
         r.notes?.toLowerCase().includes(term),
     )
   }
-
   if (selectedStatus.value === 'New') {
     list = list.filter((r) => !r.viewed_by_admin)
   } else if (selectedStatus.value !== 'All') {
     list = list.filter((r) => r.status?.toLowerCase() === selectedStatus.value.toLowerCase())
   }
-
   return list
 })
-
 // ── Report Dialog & Image Viewer ────────────────────────
 const showReportDialog = ref(false)
 const selectedReport = ref(null)
 const reporterName = ref('')
-
 const showImageViewer = ref(false)
 const activeImage = ref('')
 const zoomLevel = ref(1)
-
 function openImageViewer(img) {
   activeImage.value = img
   zoomLevel.value = 1
   showImageViewer.value = true
 }
-
 function zoomIn() {
   zoomLevel.value = Math.min(zoomLevel.value + 0.25, 3)
 }
-
 function zoomOut() {
   zoomLevel.value = Math.max(zoomLevel.value - 0.25, 0.5)
 }
-
 function resetZoom() {
   zoomLevel.value = 1
 }
-
 // ── Data Loading ────────────────────────────────────────
 async function loadReports() {
   loading.value = true
@@ -175,7 +145,6 @@ async function loadReports() {
       .from('reports')
       .select('*')
       .order('created_at', { ascending: false })
-
     if (error) throw error
     reports.value = data || []
   } catch (err) {
@@ -184,7 +153,6 @@ async function loadReports() {
     loading.value = false
   }
 }
-
 async function updateStatus(reportId, newStatus) {
   await supabase
     .from('reports')
@@ -194,48 +162,37 @@ async function updateStatus(reportId, newStatus) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', reportId)
-
   await loadReports()
 }
-
 async function openReportDetails(report) {
   selectedReport.value = report
-
   const { data, error } = await supabase.rpc('get_user_full_name', {
     user_id: report.user_id,
   })
-
   reporterName.value = error ? 'Unknown' : data || 'Unknown'
   showReportDialog.value = true
-
   if (!report.viewed_by_admin) {
     await supabase.from('reports').update({ viewed_by_admin: true }).eq('id', report.id)
-
     const found = reports.value.find((r) => r.id === report.id)
     if (found) found.viewed_by_admin = true
   }
 }
-
 async function logout() {
   await supabase.auth.signOut()
   router.replace('/login')
 }
-
 // ── Lifecycle ───────────────────────────────────────────
 onMounted(async () => {
   await loadReports()
 })
-
 function handleMobileNav(view) {
   currentView.value = view
-
   // auto-close drawer ONLY on mobile
   if (mobile.value) {
     drawer.value = false
   }
 }
 </script>
-
 <template>
   <v-app :theme="theme">
     <!-- App Bar -->
@@ -247,12 +204,9 @@ function handleMobileNav(view) {
     >
       <!-- FULL-WIDTH depth system -->
       <div class="header-depth-layer"></div>
-
       <div class="header-inner px-2 px-sm-6">
         <v-toolbar-title class="font-weight-bold header-title"> Admin Dashboard </v-toolbar-title>
-
         <v-spacer />
-
         <div class="d-flex align-center gap-3 header-right">
           <div
             class="text-caption text-white font-weight-medium ph-time"
@@ -263,7 +217,6 @@ function handleMobileNav(view) {
         </div>
       </div>
     </v-app-bar>
-
     <!-- Navigation Drawer -->
     <v-navigation-drawer
       v-model="drawer"
@@ -286,33 +239,27 @@ function handleMobileNav(view) {
             <div class="admin-role text-caption opacity-70">System Administrator</div>
           </div>
         </div>
-
         <v-divider class="my-3 mx-4" :class="{ 'mt-6': !mobile && rail }" />
-
         <v-list-item
           prepend-icon="mdi-view-dashboard"
           title="Dashboard"
           :active="currentView === 'dashboard'"
           @click="handleMobileNav('dashboard')"
         />
-
         <v-list-item
           prepend-icon="mdi-cog"
           title="Settings"
           :active="currentView === 'settings'"
           @click="handleMobileNav('settings')"
         />
-
         <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout" class="mt-8" />
       </v-list>
-
       <div class="sidebar-lump" @click="toggleSidebar">
         <v-icon size="22">
           {{ drawer ? 'mdi-chevron-left' : 'mdi-chevron-right' }}
         </v-icon>
       </div>
     </v-navigation-drawer>
-
     <!-- Main Content -->
     <v-main :class="theme === 'light' ? 'bg-grey-lighten-4' : 'bg-grey-darken-4'">
       <v-container fluid class="pa-4 pa-md-6 pb-6 pb-md-10">
@@ -326,7 +273,6 @@ function handleMobileNav(view) {
                   {{ s }}
                 </v-chip>
               </v-chip-group>
-
               <v-text-field
                 v-model="search"
                 label="Search reports"
@@ -336,7 +282,6 @@ function handleMobileNav(view) {
               />
             </v-card-text>
           </v-card>
-
           <v-data-table
             :headers="[
               { title: 'Complaint', key: 'type' },
@@ -355,7 +300,6 @@ function handleMobileNav(view) {
             <template #item.created_at="{ item }">
               {{ new Date(item.created_at).toLocaleDateString('en-PH') }}
             </template>
-
             <template #item.status="{ item }">
               <v-select
                 :model-value="item.status"
@@ -365,19 +309,16 @@ function handleMobileNav(view) {
                 @update:modelValue="(v) => updateStatus(item.id, v)"
               />
             </template>
-
             <template #item.actions="{ item }">
               <div class="d-flex align-center gap-4">
                 <v-btn size="small" color="primary" @click="openReportDetails(item)">
                   View details
                 </v-btn>
-
                 <v-chip v-if="!item.viewed_by_admin" color="error" size="small" label>NEW</v-chip>
               </div>
             </template>
           </v-data-table>
         </div>
-
         <!-- Settings View -->
         <div v-else-if="currentView === 'settings'">
           <!-- ... unchanged settings card ... -->
@@ -394,7 +335,6 @@ function handleMobileNav(view) {
             </v-avatar>
             <h2 class="font-weight-bold mb-2">Settings</h2>
             <p class="text-medium-emphasis mb-6">Manage your application settings</p>
-
             <v-list lines="one" class="pa-0">
               <v-list-group value="appearance">
                 <template v-slot:activator="{ props }">
@@ -416,7 +356,6 @@ function handleMobileNav(view) {
                   </template>
                 </v-list-item>
               </v-list-group>
-
               <!-- time-display and reports groups unchanged -->
               <v-list-group value="time-display">
                 <template v-slot:activator="{ props }">
@@ -442,7 +381,6 @@ function handleMobileNav(view) {
                   </template>
                 </v-list-item>
               </v-list-group>
-
               <v-list-group value="reports">
                 <template v-slot:activator="{ props }">
                   <v-list-item
@@ -465,7 +403,6 @@ function handleMobileNav(view) {
                 </v-list-item>
               </v-list-group>
             </v-list>
-
             <div class="button-group d-flex flex-wrap justify-center align-center mt-6">
               <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'">
                 <v-icon start>mdi-arrow-left</v-icon> Back to Dashboard
@@ -475,7 +412,6 @@ function handleMobileNav(view) {
         </div>
       </v-container>
     </v-main>
-
     <!-- Dialogs and Snackbar unchanged -->
     <v-dialog v-model="showReportDialog" max-width="820">
       <v-card rounded="xl" class="pa-4">
@@ -486,8 +422,11 @@ function handleMobileNav(view) {
           <p><strong>Reported by:</strong> {{ reporterName }}</p>
           <p><strong>Severity:</strong> {{ selectedReport.severity || 'N/A' }}</p>
           <p><strong>Landmark:</strong> {{ selectedReport.landmark || 'N/A' }}</p>
+          <p>
+            <strong>Coordinates:</strong> Lat: {{ selectedReport.latitude || 'N/A' }} Lng:
+            {{ selectedReport.longitude || 'N/A' }}
+          </p>
           <p><strong>Notes:</strong> {{ selectedReport.notes || 'N/A' }}</p>
-
           <v-row dense class="mt-4">
             <v-col v-for="(img, i) in selectedReport.images || []" :key="i" cols="12" sm="6">
               <v-img
@@ -500,14 +439,12 @@ function handleMobileNav(view) {
             </v-col>
           </v-row>
         </v-card-text>
-
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showReportDialog = false">Close</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
-
     <v-dialog v-model="showImageViewer" max-width="900">
       <v-card>
         <v-card-text
@@ -529,13 +466,11 @@ function handleMobileNav(view) {
         </v-card-actions>
       </v-card>
     </v-dialog>
-
     <v-snackbar v-model="snackbar" timeout="2000" color="success" location="bottom">
       {{ snackbarMessage }}
     </v-snackbar>
   </v-app>
 </template>
-
 <style scoped>
 /* All your existing styles remain unchanged */
 .ph-time {
@@ -567,7 +502,6 @@ function handleMobileNav(view) {
 .cursor-pointer {
   cursor: pointer;
 }
-
 .sidebar-lump {
   position: absolute;
   top: 50%;
@@ -599,7 +533,6 @@ function handleMobileNav(view) {
 .v-navigation-drawer--rail .sidebar-lump {
   right: -32px;
 }
-
 .modern-card {
   transition: all 0.3s ease;
 }
@@ -614,21 +547,17 @@ function handleMobileNav(view) {
 /* ============================= */
 /* FULL-WIDTH HEADER DEPTH */
 /* ============================= */
-
 .admin-header {
   position: relative;
   padding: 0 !important; /* remove vuetify internal padding */
   overflow: hidden;
   z-index: 20;
-
   /* elevation */
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.25),
     0 6px 18px rgba(0, 0, 0, 0.18);
-
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-
 /* true full-width depth layer */
 .header-depth-layer {
   position: absolute;
@@ -637,7 +566,6 @@ function handleMobileNav(view) {
   left: 50%;
   transform: translateX(-50%); /* center it */
   pointer-events: none;
-
   background: linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0.14),
@@ -646,7 +574,6 @@ function handleMobileNav(view) {
   );
   z-index: 0;
 }
-
 /* content wrapper */
 .header-inner {
   position: relative;
@@ -655,23 +582,19 @@ function handleMobileNav(view) {
   align-items: center;
   width: 100%;
 }
-
 /* text depth */
 .header-title {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
   letter-spacing: 0.4px;
 }
-
 .header-right {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
-
 /* dark mode tuning */
 .v-theme--dark .admin-header {
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.55),
     0 10px 28px rgba(0, 0, 0, 0.65);
-
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 </style>
