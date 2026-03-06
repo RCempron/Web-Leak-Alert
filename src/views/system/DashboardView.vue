@@ -5,11 +5,9 @@ import { useDisplay, useTheme } from 'vuetify'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/utils/supabase.js'
 import AlertNotification from '@/components/common/AlertNotification.vue'
-
 const { mobile } = useDisplay()
 const router = useRouter()
 const vuetifyTheme = useTheme()
-
 // ── Theme ───────────────────────────────────────────────
 const theme = ref(localStorage.getItem('theme') ?? 'light')
 vuetifyTheme.change(theme.value)
@@ -21,7 +19,6 @@ watch(theme, (newTheme) => {
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
 }
-
 // ── Real-time PH Time ───────────────────────────────────
 const phTime = ref('')
 let timer = null
@@ -52,13 +49,11 @@ onMounted(() => {
 onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
-
 // ── Reports & Filtering ─────────────────────────────────
 const updatedReports = ref(new Set())
 const lastViewedUpdates = ref(JSON.parse(localStorage.getItem('lastViewedUpdates') || '{}'))
 const notificationCount = computed(() => updatedReports.value.size)
 const showUpdatedOnly = ref(false)
-
 function showUpdatedReports() {
   currentView.value = 'dashboard'
   showUpdatedOnly.value = true
@@ -72,7 +67,6 @@ function resetToAllReports() {
   selectedType.value = 'all'
   page.value = 1
 }
-
 const reports = ref([])
 async function fetchReports() {
   const { data: userData } = await supabase.auth.getUser()
@@ -84,12 +78,10 @@ async function fetchReports() {
     .order('created_at', { ascending: false })
   reports.value = data || []
 }
-
 const baseReportsForFiltering = computed(() => {
   if (!showUpdatedOnly.value) return reports.value
   return reports.value.filter((r) => updatedReports.value.has(r.id))
 })
-
 const statusCounts = computed(() => {
   const counts = {
     all: baseReportsForFiltering.value.length,
@@ -103,7 +95,6 @@ const statusCounts = computed(() => {
   })
   return counts
 })
-
 const typeCounts = computed(() => {
   const counts = {}
   baseReportsForFiltering.value.forEach((r) => {
@@ -112,10 +103,8 @@ const typeCounts = computed(() => {
   })
   return counts
 })
-
 const currentStatus = ref('all')
 const selectedType = ref('all')
-
 const filteredReports = computed(() => {
   let filtered = baseReportsForFiltering.value
   if (currentStatus.value !== 'all')
@@ -125,7 +114,6 @@ const filteredReports = computed(() => {
   }
   return filtered
 })
-
 const page = ref(1)
 const itemsPerPage = ref(parseInt(localStorage.getItem('itemsPerPage')) || 10)
 watch(itemsPerPage, (val) => {
@@ -133,16 +121,13 @@ watch(itemsPerPage, (val) => {
   showSnackbar('Items per page changed')
   page.value = 1
 })
-
 const paginatedReports = computed(() => {
   const start = (page.value - 1) * itemsPerPage.value
   return filteredReports.value.slice(start, start + itemsPerPage.value)
 })
-
 const paginationLength = computed(() =>
   Math.ceil(filteredReports.value.length / itemsPerPage.value),
 )
-
 // ── UPDATED ICONS (water leak & broken pipe now different) ───────
 const typeIcons = {
   'low pressure': 'mdi-water',
@@ -153,7 +138,6 @@ const typeIcons = {
   'no water': 'mdi-water-off',
   other: 'mdi-help-circle',
 }
-
 const typeColors = {
   'low pressure': 'red',
   'broken pipe': 'red',
@@ -163,14 +147,12 @@ const typeColors = {
   'no water': 'red',
   other: 'grey',
 }
-
 const statusColors = {
   pending: 'amber',
   ongoing: 'blue',
   resolved: 'green',
   rejected: 'red',
 }
-
 const userName = ref('')
 async function fetchUser() {
   const { data } = await supabase.auth.getUser()
@@ -180,7 +162,6 @@ async function fetchUser() {
     data?.user?.email?.split('@')[0] ||
     'User'
 }
-
 // ── Report Dialog & Image Viewer ────────────────────────
 const dialog = ref(false)
 const selectedReport = ref(null)
@@ -191,7 +172,6 @@ function openReportDetails(report) {
   localStorage.setItem('lastViewedUpdates', JSON.stringify(lastViewedUpdates.value))
   updatedReports.value.delete(report.id)
 }
-
 const showImageViewer = ref(false)
 const activeImage = ref('')
 const zoomLevel = ref(1)
@@ -209,7 +189,6 @@ function zoomOut() {
 function resetZoom() {
   zoomLevel.value = 1
 }
-
 // ── Sidebar ─────────────────────────────────────────────
 const drawer = ref(!mobile.value)
 const rail = ref(false)
@@ -226,7 +205,6 @@ watch(mobile, (isMobile) => {
     rail.value = false
   }
 })
-
 // ── Data Loading ────────────────────────────────────────
 async function loadData() {
   await fetchReports()
@@ -241,7 +219,6 @@ async function loadData() {
 }
 onMounted(loadData)
 onActivated(loadData)
-
 // ── Profile ─────────────────────────────────────────────
 const loading = ref(false)
 const saving = ref(false)
@@ -254,7 +231,6 @@ const age = ref('')
 const residency = ref('')
 const formSuccessMessage = ref('')
 const formErrorMessage = ref('')
-
 async function loadCurrentUser() {
   loading.value = true
   try {
@@ -272,7 +248,6 @@ async function loadCurrentUser() {
     loading.value = false
   }
 }
-
 async function saveProfile() {
   if (!firstname.value || !lastname.value) {
     formErrorMessage.value = 'Please fill out all required fields.'
@@ -301,10 +276,8 @@ async function saveProfile() {
     saving.value = false
   }
 }
-
 const currentView = ref('dashboard')
 onMounted(loadCurrentUser)
-
 // ── Snackbar ────────────────────────────────────────────
 const snackbar = ref(false)
 const snackbarMessage = ref('')
@@ -320,7 +293,6 @@ function handleMobileNav(view) {
   currentView.value = view
   if (mobile.value) drawer.value = false
 }
-
 // ── Avatar ──────────────────────────────────────────────
 const colors = [
   'red',
@@ -347,7 +319,6 @@ const avatarColor = computed(() => {
   return colors[index]
 })
 </script>
-
 <template>
   <v-app :theme="theme">
     <!-- App Bar -->
@@ -373,7 +344,6 @@ const avatarColor = computed(() => {
         </div>
       </div>
     </v-app-bar>
-
     <!-- Navigation Drawer -->
     <v-navigation-drawer
       v-model="drawer"
@@ -420,7 +390,6 @@ const avatarColor = computed(() => {
         <v-icon size="22">{{ drawer ? 'mdi-chevron-left' : 'mdi-chevron-right' }}</v-icon>
       </div>
     </v-navigation-drawer>
-
     <!-- Main Content -->
     <v-main :class="theme === 'light' ? 'bg-grey-lighten-4' : 'bg-grey-darken-4'">
       <v-container fluid class="pa-4 pa-md-6 pb-6 pb-md-10">
@@ -432,7 +401,6 @@ const avatarColor = computed(() => {
             Report and track water-related issues quickly and easily.
           </p>
         </div>
-
         <!-- Dashboard -->
         <div v-if="currentView === 'dashboard'">
           <v-card rounded="lg" elevation="2" class="position-relative">
@@ -464,7 +432,6 @@ const avatarColor = computed(() => {
                 </v-btn>
               </div>
             </v-card-title>
-
             <v-alert
               v-if="showUpdatedOnly"
               density="compact"
@@ -488,7 +455,6 @@ const avatarColor = computed(() => {
                 >
               </div>
             </v-alert>
-
             <v-card-text class="px-6 pb-6">
               <v-chip-group v-if="!showUpdatedOnly" v-model="currentStatus" mandatory class="mb-6">
                 <v-chip
@@ -511,7 +477,6 @@ const avatarColor = computed(() => {
                   >Rejected <strong class="ml-1">{{ statusCounts.rejected }}</strong></v-chip
                 >
               </v-chip-group>
-
               <div v-if="!showUpdatedOnly" class="mb-6">
                 <div class="text-subtitle-1 mb-2">Filter by Type</div>
                 <v-chip-group v-model="selectedType" class="d-flex flex-wrap">
@@ -530,7 +495,6 @@ const avatarColor = computed(() => {
                   </v-chip>
                 </v-chip-group>
               </div>
-
               <v-row>
                 <v-col cols="12">
                   <v-card
@@ -581,7 +545,6 @@ const avatarColor = computed(() => {
                   </div>
                 </v-col>
               </v-row>
-
               <div class="text-center mt-6">
                 <v-pagination
                   v-model="page"
@@ -593,7 +556,6 @@ const avatarColor = computed(() => {
             </v-card-text>
           </v-card>
         </div>
-
         <!-- Profile View -->
         <div v-else-if="currentView === 'profile'">
           <v-card
@@ -690,7 +652,6 @@ const avatarColor = computed(() => {
             </div>
           </v-card>
         </div>
-
         <!-- Settings View -->
         <div v-else-if="currentView === 'settings'">
           <v-card
@@ -782,7 +743,6 @@ const avatarColor = computed(() => {
         </div>
       </v-container>
     </v-main>
-
     <!-- Mobile Footer -->
     <v-row v-if="mobile" class="mt-auto mx-0">
       <v-col cols="12" class="px-0">
@@ -823,7 +783,6 @@ const avatarColor = computed(() => {
         </div>
       </v-col>
     </v-row>
-
     <!-- Desktop Footer -->
     <v-footer
       v-if="!mobile"
@@ -865,45 +824,27 @@ const avatarColor = computed(() => {
         </v-row>
       </v-container>
     </v-footer>
-
     <!-- Report Details Dialog -->
-    <v-dialog v-model="dialog" max-width="600px">
+    <v-dialog v-model="dialog" max-width="820">
       <v-card v-if="selectedReport" rounded="xl" class="pa-4">
-        <v-card-title class="d-flex align-center pa-0 mb-4">
-          <span class="text-h6 font-weight-bold">{{ selectedReport.type || 'Other' }}</span>
-          <v-spacer />
-          <v-chip :color="statusColors[selectedReport.status]" variant="outlined" size="small">{{
-            (selectedReport.status || 'pending').toUpperCase()
-          }}</v-chip>
-        </v-card-title>
-        <v-card-text class="pa-0">
-          <p class="mb-2">Severity: {{ selectedReport.severity || 'N/A' }}</p>
-          <p class="mb-2">Pipe Location: {{ selectedReport.pipe_location || 'N/A' }}</p>
-          <p class="mb-2">
-            Landmark: {{ selectedReport.landmark || selectedReport.location || 'N/A' }}
+        <v-card-title class="font-weight-bold">Complaint Details</v-card-title>
+        <v-divider />
+        <v-card-text>
+          <p><strong>Type:</strong> {{ selectedReport.type || 'N/A' }}</p>
+          <p><strong>Reported by:</strong> {{ userName }}</p>
+          <p><strong>Severity:</strong> {{ selectedReport.severity || 'N/A' }}</p>
+          <p><strong>Landmark:</strong> {{ selectedReport.landmark || selectedReport.location || 'N/A' }}</p>
+          <p>
+            <strong>Coordinates:</strong> Lat: {{ selectedReport.latitude || 'N/A' }} Lng:
+            {{ selectedReport.longitude || 'N/A' }}
           </p>
-          <p class="mb-4">
-            Notes: {{ selectedReport.notes || selectedReport.description || 'N/A' }}
-          </p>
-          <p class="mb-4 text-caption text-medium-emphasis">
-            Submitted:
-            {{
-              new Date(selectedReport.created_at).toLocaleString('en-US', {
-                month: 'numeric',
-                day: 'numeric',
-                year: 'numeric',
-                hour: 'numeric',
-                minute: 'numeric',
-                second: 'numeric',
-                hour12: true,
-              })
-            }}
-          </p>
+          <p><strong>Notes:</strong> {{ selectedReport.notes || selectedReport.description || 'N/A' }}</p>
+          <p><strong>Assigned to:</strong> {{ selectedReport.assigned_personnel || 'N/A' }}</p>
           <v-row v-if="selectedReport.images && selectedReport.images.length" dense class="mt-4">
-            <v-col v-for="(img, i) in selectedReport.images" :key="i" cols="12" sm="6" md="4">
+            <v-col v-for="(img, i) in selectedReport.images" :key="i" cols="12" sm="6">
               <v-img
                 :src="img"
-                aspect-ratio="1"
+                height="140"
                 cover
                 class="rounded cursor-pointer"
                 @click="openImageViewer(img)"
@@ -917,7 +858,6 @@ const avatarColor = computed(() => {
         >
       </v-card>
     </v-dialog>
-
     <!-- Image Zoom Dialog -->
     <v-dialog v-model="showImageViewer" max-width="900">
       <v-card>
@@ -940,14 +880,12 @@ const avatarColor = computed(() => {
         </v-card-actions>
       </v-card>
     </v-dialog>
-
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar" timeout="2000" color="success" location="bottom">{{
       snackbarMessage
     }}</v-snackbar>
   </v-app>
 </template>
-
 <style scoped>
 /* Your original styles (unchanged) */
 .ph-time {
