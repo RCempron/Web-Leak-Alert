@@ -137,6 +137,11 @@ function zoomOut() {
 function resetZoom() {
   zoomLevel.value = 1
 }
+// ── Assign Personnel Dialog ─────────────────────────────
+const showAssignDialog = ref(false)
+const selectedReportForAssign = ref(null)
+const assignedPersonnel = ref('')
+const personnelOptions = ['Maintenance Team A', 'Maintenance Team B', 'Maintenance Team C']
 // ── Data Loading ────────────────────────────────────────
 async function loadReports() {
   loading.value = true
@@ -153,16 +158,47 @@ async function loadReports() {
     loading.value = false
   }
 }
-async function updateStatus(reportId, newStatus) {
+async function updateStatus(reportId, newStatus, personnel = null) {
+  const updates = {
+    status: newStatus,
+    viewed_by_admin: true,
+    updated_at: new Date().toISOString(),
+  }
+  if (personnel) {
+    updates.assigned_personnel = personnel
+  }
   await supabase
     .from('reports')
-    .update({
-      status: newStatus,
-      viewed_by_admin: true,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq('id', reportId)
   await loadReports()
+}
+function handleStatusChange(item, newStatus) {
+  const oldStatus = item.status
+  item.status = newStatus // Optimistic update for UI
+  if (oldStatus === 'pending' && newStatus === 'ongoing') {
+    selectedReportForAssign.value = item
+    assignedPersonnel.value = item.assigned_personnel || ''
+    showAssignDialog.value = true
+  } else {
+    updateStatus(item.id, newStatus)
+  }
+}
+async function confirmAssign() {
+  if (!assignedPersonnel.value) {
+    showSnackbar('Please select personnel')
+    return
+  }
+  await updateStatus(selectedReportForAssign.value.id, 'ongoing', assignedPersonnel.value)
+  showAssignDialog.value = false
+  selectedReportForAssign.value = null
+  assignedPersonnel.value = ''
+}
+function cancelAssign() {
+  selectedReportForAssign.value.status = 'pending' // Revert optimistic update
+  showAssignDialog.value = false
+  selectedReportForAssign.value = null
+  assignedPersonnel.value = ''
 }
 async function openReportDetails(report) {
   selectedReport.value = report
@@ -306,7 +342,7 @@ function handleMobileNav(view) {
                 :items="['pending', 'ongoing', 'resolved', 'rejected']"
                 density="compact"
                 hide-details
-                @update:modelValue="(v) => updateStatus(item.id, v)"
+                @update:modelValue="(v) => handleStatusChange(item, v)"
               />
             </template>
             <template #item.actions="{ item }">
@@ -427,6 +463,7 @@ function handleMobileNav(view) {
             {{ selectedReport.longitude || 'N/A' }}
           </p>
           <p><strong>Notes:</strong> {{ selectedReport.notes || 'N/A' }}</p>
+          <p><strong>Assigned to:</strong> {{ selectedReport.assigned_personnel || 'N/A' }}</p>
           <v-row dense class="mt-4">
             <v-col v-for="(img, i) in selectedReport.images || []" :key="i" cols="12" sm="6">
               <v-img
@@ -463,6 +500,27 @@ function handleMobileNav(view) {
           <v-btn icon @click="zoomIn"><v-icon>mdi-magnify-plus</v-icon></v-btn>
           <v-spacer />
           <v-btn variant="text" @click="showImageViewer = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    <!-- Assign Personnel Dialog -->
+    <v-dialog v-model="showAssignDialog" max-width="500">
+      <v-card rounded="xl" class="pa-4">
+        <v-card-title class="font-weight-bold">Assign Personnel</v-card-title>
+        <v-divider />
+        <v-card-text>
+          <v-select
+            v-model="assignedPersonnel"
+            :items="personnelOptions"
+            label="Select Personnel"
+            density="compact"
+            hide-details
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="cancelAssign">Cancel</v-btn>
+          <v-btn color="primary" @click="confirmAssign">Assign</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
