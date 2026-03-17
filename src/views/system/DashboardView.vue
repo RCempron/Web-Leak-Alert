@@ -1,10 +1,12 @@
 <!-- src/views/system/DashboardView.vue -->
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed, onActivated } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, onActivated, nextTick } from 'vue'
 import { useDisplay, useTheme } from 'vuetify'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/utils/supabase.js'
 import AlertNotification from '@/components/common/AlertNotification.vue'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 const { mobile } = useDisplay()
 const router = useRouter()
 const vuetifyTheme = useTheme()
@@ -318,6 +320,92 @@ const avatarColor = computed(() => {
   const index = Math.abs(userName.value.charCodeAt(0)) % colors.length
   return colors[index]
 })
+// ── Map Integration for Pinning ─────────────────────────
+const mapInstance = ref(null)
+const markerInstance = ref(null)
+
+watch(dialog, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    // Ensure map container is ready and visible
+    const mapContainer = document.getElementById('report-map')
+    if (!mapContainer) return
+    
+    // Initialize map centered on Cagayan de Oro
+    mapInstance.value = L.map('report-map', { 
+      preferCanvas: true,
+      zoomControl: true,
+      dragging: true
+    }).setView([8.4542, 124.6319], 13)
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(mapInstance.value)
+    
+    // Reset marker when opening dialog
+    markerInstance.value = null
+    
+    // Wait for dialog to fully render, then trigger map resize
+    await new Promise(resolve => {
+      setTimeout(() => {
+        if (mapInstance.value) {
+          mapInstance.value.invalidateSize(true)
+        }
+        resolve()
+      }, 300)
+    })
+    
+    // If report already has coordinates, show marker
+    if (selectedReport.value?.latitude && selectedReport.value?.longitude) {
+      const latLng = [selectedReport.value.latitude, selectedReport.value.longitude]
+      markerInstance.value = L.marker(latLng).addTo(mapInstance.value)
+      mapInstance.value.setView(latLng, 15)
+    }
+    
+    // Add click handler to map
+    mapInstance.value.on('click', (e) => {
+      // Remove old marker if exists
+      if (markerInstance.value) {
+        markerInstance.value.remove()
+      }
+      // Add new marker at clicked location
+      markerInstance.value = L.marker(e.latlng).addTo(mapInstance.value)
+    })
+  } else {
+    // Clean up map on dialog close
+    if (mapInstance.value) {
+      mapInstance.value.off('click')
+      mapInstance.value.remove()
+      mapInstance.value = null
+      markerInstance.value = null
+    }
+  }
+})
+
+async function savePin() {
+  if (!markerInstance.value) {
+    showSnackbar('Please select a location on the map first')
+    return
+  }
+  
+  try {
+    const { lat, lng } = markerInstance.value.getLatLng()
+    const { error } = await supabase
+      .from('reports')
+      .update({ latitude: lat, longitude: lng })
+      .eq('id', selectedReport.value.id)
+    
+    if (error) throw error
+    
+    selectedReport.value.latitude = lat
+    selectedReport.value.longitude = lng
+    showSnackbar('Location pinned successfully')
+    await fetchReports()
+  } catch (err) {
+    console.error('Save pin error:', err)
+    showSnackbar('Error saving location: ' + err.message)
+  }
+}
 </script>
 <template>
   <v-app :theme="theme">
@@ -851,11 +939,16 @@ const avatarColor = computed(() => {
               />
             </v-col>
           </v-row>
+          <!-- Map for Pinning -->
+          <h3 class="mt-6 mb-2">Pin Location on Map</h3>
+          <p class="text-caption text-medium-emphasis mb-3">Click on the map to place or move the pin. Then save.</p>
+          <div id="report-map" style="height: 300px; width: 100%; border: 1px solid #ddd; border-radius: 8px; z-index: 0; position: relative;"></div>
         </v-card-text>
-        <v-card-actions
-          ><v-spacer></v-spacer
-          ><v-btn color="primary" text @click="dialog = false">Close</v-btn></v-card-actions
-        >
+        <v-card-actions class="dialog-actions">
+          <v-spacer></v-spacer>
+          <v-btn color="primary" variant="flat" @click="savePin" :disabled="!markerInstance">Save Pin</v-btn>
+          <v-btn color="primary" text @click="dialog = false">Close</v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
     <!-- Image Zoom Dialog -->
@@ -1150,5 +1243,10 @@ const avatarColor = computed(() => {
     font-size: 0.6rem !important;
     height: 22px !important;
   }
+}
+/* Add this to ensure actions are on top */
+.dialog-actions {
+  z-index: 10;
+  position: relative;
 }
 </style>

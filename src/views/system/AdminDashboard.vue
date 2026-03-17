@@ -1,9 +1,11 @@
 <!-- src/views/system/AdminDashboard.vue -->
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDisplay, useTheme } from 'vuetify'
 import { supabase } from '@/utils/supabase'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 const { mobile } = useDisplay()
 const router = useRouter()
 const vuetifyTheme = useTheme()
@@ -70,6 +72,17 @@ watch(mobile, (isMobile) => {
 })
 // ── View State ──────────────────────────────────────────
 const currentView = ref('dashboard')
+// ── Map State ────────────────────────────────────────────
+const mapInstance = ref(null)
+const mapMarkers = ref([])
+const selectedMapPin = ref(null)
+const showPinDetails = ref(false)
+const mapLoading = ref(false)
+const mapStatusUpdate = ref('')
+const highlightedReportId = ref(null)
+const reportsWithCoordinates = computed(() => {
+  return reports.value.filter(r => r.latitude && r.longitude)
+})
 // ── Settings ────────────────────────────────────────────
 const itemsPerPage = ref(parseInt(localStorage.getItem('adminItemsPerPage')) || 10)
 watch(itemsPerPage, (val) => {
@@ -217,9 +230,205 @@ async function logout() {
   await supabase.auth.signOut()
   router.replace('/login')
 }
+// ── Map Management ──────────────────────────────────────
+async function initializeMap() {
+  await nextTick()
+  const mapContainer = document.getElementById('admin-report-map')
+  if (!mapContainer || mapInstance.value) return
+
+  mapInstance.value = L.map('admin-report-map', {
+    preferCanvas: true,
+    zoomControl: true,
+    dragging: true,
+  }).setView([8.9731, 125.5244], 13)
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(mapInstance.value)
+
+  // Wait for map to fully render
+  await new Promise(resolve => {
+    setTimeout(() => {
+      if (mapInstance.value) {
+        mapInstance.value.invalidateSize(true)
+        loadMapPins()
+      }
+      resolve()
+    }, 300)
+  })
+}
+
+async function loadMapPins() {
+  if (!mapInstance.value) return
+
+  // Clear existing markers
+  mapMarkers.value.forEach(marker => marker.remove())
+  mapMarkers.value = []
+
+  // Create markers for each report with coordinates
+  for (const report of reportsWithCoordinates.value) {
+    const latLng = [report.latitude, report.longitude]
+    
+    // Get consumer name
+    const { data: nameData } = await supabase.rpc('get_user_full_name', {
+      user_id: report.user_id,
+    })
+    const consumerName = nameData || 'Unknown'
+
+    // Create marker with custom color based on status
+    const statusColors = {
+      pending: '#FFA726',
+      ongoing: '#42A5F5',
+      resolved: '#66BB6A',
+      rejected: '#EF5350',
+    }
+    const statusColor = statusColors[report.status] || '#9CCC65'
+
+    // Create outer glow effect
+    const glowMarker = L.circleMarker(latLng, {
+      radius: 20,
+      fillColor: statusColor,
+      color: statusColor,
+      weight: 0,
+      opacity: 0.3,
+      fillOpacity: 0.2,
+      className: 'marker-glow',
+    }).addTo(mapInstance.value)
+
+    // Create main marker (bigger and more noticeable)
+    const marker = L.circleMarker(latLng, {
+      radius: 16,
+      fillColor: statusColor,
+      color: '#fff',
+      weight: 3,
+      opacity: 1,
+      fillOpacity: 0.95,
+      className: 'map-marker-main',
+    })
+      .addTo(mapInstance.value)
+      .bindPopup(`
+        <div style="font-size: 13px; min-width: 160px; font-weight: 500;">
+          <strong style="color: #1565c0;">${consumerName}</strong><br/>
+          <span style="color: #666;">${report.type}</span><br/>
+          <small>${report.landmark || 'N/A'}</small><br/>
+          <small>Status: <strong style="color: ${statusColor};">${report.status}</strong></small>
+        </div>
+      `)
+
+    // Add hover effects
+    marker.on('mouseover', function() {
+      this.setRadius(20)
+      this.setStyle({ weight: 4, fillOpacity: 1 })
+    })
+
+    marker.on('mouseout', function() {
+      this.setRadius(16)
+      this.setStyle({ weight: 3, fillOpacity: 0.95 })
+    })
+
+    marker.on('click', () => {
+      selectedMapPin.value = {
+        ...report,
+        consumerName,
+      }
+      showPinDetails.value = true
+    })
+
+    mapMarkers.value.push(marker)
+    mapMarkers.value.push(glowMarker)
+  }
+}
+
+function cleanupMap() {
+  if (mapInstance.value) {
+    mapMarkers.value.forEach(marker => marker.remove())
+    mapMarkers.value = []
+    mapInstance.value.remove()
+    mapInstance.value = null
+  }
+}
+
+watch(currentView, async (newView) => {
+  if (newView === 'map') {
+    await initializeMap()
+  } else {
+    cleanupMap()
+  }
+})
+
+watch(() => reports.value.length, async () => {
+  if (currentView.value === 'map' && mapInstance.value) {
+    await loadMapPins()
+  }
+}, { deep: true })
+
+function viewReportFromMap() {
+  if (selectedMapPin.value) {
+    highlightedReportId.value = selectedMapPin.value.id
+    showPinDetails.value = false
+    currentView.value = 'dashboard'
+    // Scroll to the highlighted report after a short delay to ensure DOM is updated
+    setTimeout(() => {
+      const reportElement = document.querySelector(`[data-report-id="${selectedMapPin.value.id}"]`)
+      if (reportElement) {
+        reportElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        reportElement.classList.add('highlight-report')
+        
+        // Remove highlight after 5 seconds
+        setTimeout(() => {
+          reportElement.classList.remove('highlight-report')
+          highlightedReportId.value = null
+        }, 5000)
+      }
+    }, 100)
+  }
+}
+
+async function updateMapPinStatus() {
+  if (!selectedMapPin.value || !mapStatusUpdate.value) {
+    showSnackbar('Please select a status')
+    return
+  }
+
+  try {
+    const { error } = await supabase
+      .from('reports')
+      .update({
+        status: mapStatusUpdate.value,
+        viewed_by_admin: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', selectedMapPin.value.id)
+
+    if (error) throw error
+
+    // Update the local pin data
+    selectedMapPin.value.status = mapStatusUpdate.value
+
+    // Update the reports list
+    const reportIndex = reports.value.findIndex(r => r.id === selectedMapPin.value.id)
+    if (reportIndex !== -1) {
+      reports.value[reportIndex].status = mapStatusUpdate.value
+    }
+
+    showSnackbar('Status updated successfully')
+    mapStatusUpdate.value = ''
+    
+    // Reload map pins to reflect the status color change
+    if (currentView.value === 'map' && mapInstance.value) {
+      await loadMapPins()
+    }
+  } catch (err) {
+    console.error('Status update error:', err)
+    showSnackbar('Error updating status: ' + err.message)
+  }
+}
 // ── Lifecycle ───────────────────────────────────────────
 onMounted(async () => {
   await loadReports()
+})
+onUnmounted(() => {
+  cleanupMap()
 })
 function handleMobileNav(view) {
   currentView.value = view
@@ -283,6 +492,12 @@ function handleMobileNav(view) {
           @click="handleMobileNav('dashboard')"
         />
         <v-list-item
+          prepend-icon="mdi-map"
+          title="Map"
+          :active="currentView === 'map'"
+          @click="handleMobileNav('map')"
+        />
+        <v-list-item
           prepend-icon="mdi-cog"
           title="Settings"
           :active="currentView === 'settings'"
@@ -333,25 +548,33 @@ function handleMobileNav(view) {
             class="elevation-1"
           >
             <!-- templates unchanged -->
-            <template #item.created_at="{ item }">
-              {{ new Date(item.created_at).toLocaleDateString('en-PH') }}
-            </template>
-            <template #item.status="{ item }">
-              <v-select
-                :model-value="item.status"
-                :items="['pending', 'ongoing', 'resolved', 'rejected']"
-                density="compact"
-                hide-details
-                @update:modelValue="(v) => handleStatusChange(item, v)"
-              />
-            </template>
-            <template #item.actions="{ item }">
-              <div class="d-flex align-center gap-4">
-                <v-btn size="small" color="primary" @click="openReportDetails(item)">
-                  View details
-                </v-btn>
-                <v-chip v-if="!item.viewed_by_admin" color="error" size="small" label>NEW</v-chip>
-              </div>
+            <template #item="{ item, index }">
+              <tr 
+                :key="item.id" 
+                :data-report-id="item.id"
+                :class="['data-table-row', { 'highlight-report': highlightedReportId === item.id }]"
+              >
+                <td>{{ item.type }}</td>
+                <td>{{ item.landmark }}</td>
+                <td>{{ new Date(item.created_at).toLocaleDateString('en-PH') }}</td>
+                <td>
+                  <v-select
+                    :model-value="item.status"
+                    :items="['pending', 'ongoing', 'resolved', 'rejected']"
+                    density="compact"
+                    hide-details
+                    @update:modelValue="(v) => handleStatusChange(item, v)"
+                  />
+                </td>
+                <td>
+                  <div class="d-flex align-center gap-4">
+                    <v-btn size="small" color="primary" @click="openReportDetails(item)">
+                      View details
+                    </v-btn>
+                    <v-chip v-if="!item.viewed_by_admin" color="error" size="small" label>NEW</v-chip>
+                  </div>
+                </td>
+              </tr>
             </template>
           </v-data-table>
         </div>
@@ -446,8 +669,64 @@ function handleMobileNav(view) {
             </div>
           </v-card>
         </div>
+        <!-- Map View -->
+        <div v-else-if="currentView === 'map'" style="height: calc(100vh - 200px)">
+          <v-card flat style="height: 100%; display: flex; flex-direction: column">
+            <v-card-title class="font-weight-bold d-flex align-center justify-space-between">
+              <span>Consumer Reports Map</span>
+              <v-chip 
+                color="info" 
+                variant="outlined"
+                :label="`${reportsWithCoordinates.length} Pins`"
+              />
+            </v-card-title>
+            <v-divider />
+            <v-card-text style="flex: 1; padding: 0; overflow: hidden">
+              <div id="admin-report-map" style="width: 100%; height: 100%; border-radius: 8px 8px 0 0"></div>
+            </v-card-text>
+            <v-card-actions>
+              <v-btn variant="outlined" @click="currentView = 'dashboard'">
+                <v-icon start>mdi-arrow-left</v-icon> Back to Dashboard
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </div>
       </v-container>
     </v-main>
+    <!-- Pin Details Dialog -->
+    <v-dialog v-model="showPinDetails" max-width="500">
+      <v-card rounded="xl" class="pa-4">
+        <v-card-title class="font-weight-bold">Pin Details</v-card-title>
+        <v-divider />
+        <v-card-text v-if="selectedMapPin">
+          <p><strong>Consumer:</strong> {{ selectedMapPin.consumerName }}</p>
+          <p><strong>Type:</strong> {{ selectedMapPin.type }}</p>
+          <p><strong>Landmark:</strong> {{ selectedMapPin.landmark || 'N/A' }}</p>
+          <p><strong>Current Status:</strong> <v-chip :color="statusColors[selectedMapPin.status]" size="small">{{ selectedMapPin.status }}</v-chip></p>
+          <p><strong>Severity:</strong> {{ selectedMapPin.severity || 'N/A' }}</p>
+          <p><strong>Notes:</strong> {{ selectedMapPin.notes || 'N/A' }}</p>
+          <p><strong>Coordinates:</strong><br/>Lat: {{ selectedMapPin.latitude }}<br/>Lng: {{ selectedMapPin.longitude }}</p>
+          
+          <v-divider class="my-4" />
+          <p class="font-weight-bold mb-2">Update Status</p>
+          <v-select
+            v-model="mapStatusUpdate"
+            :items="['pending', 'ongoing', 'resolved', 'rejected']"
+            label="Select new status"
+            density="compact"
+            outlined
+            hide-details
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showPinDetails = false">Close</v-btn>
+          <v-btn color="primary" variant="flat" @click="updateMapPinStatus" :disabled="!mapStatusUpdate">
+            <v-icon start>mdi-check</v-icon> Update Status
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <!-- Dialogs and Snackbar unchanged -->
     <v-dialog v-model="showReportDialog" max-width="820">
       <v-card rounded="xl" class="pa-4">
@@ -654,5 +933,53 @@ function handleMobileNav(view) {
     0 2px 8px rgba(0, 0, 0, 0.55),
     0 10px 28px rgba(0, 0, 0, 0.65);
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+/* Map styles */
+#admin-report-map {
+  position: relative;
+  z-index: 1;
+}
+.leaflet-popup-content {
+  font-family: 'Roboto', sans-serif !important;
+  margin: 0 !important;
+}
+.leaflet-popup {
+  margin-bottom: 0 !important;
+}
+/* Highlight Report Row */
+.data-table-row {
+  transition: all 0.3s ease;
+}
+.highlight-report {
+  background: linear-gradient(90deg, rgba(21, 101, 192, 0.15), rgba(33, 150, 243, 0.08)) !important;
+  box-shadow: inset 3px 0 0 0 #1565c0;
+  animation: highlightPulse 2s ease-in-out;
+}
+@keyframes highlightPulse {
+  0% {
+    background: linear-gradient(90deg, rgba(21, 101, 192, 0.35), rgba(33, 150, 243, 0.2)) !important;
+    box-shadow: inset 3px 0 0 0 #1565c0, 0 0 12px rgba(21, 101, 192, 0.4);
+  }
+  50% {
+    background: linear-gradient(90deg, rgba(21, 101, 192, 0.25), rgba(33, 150, 243, 0.15)) !important;
+  }
+  100% {
+    background: linear-gradient(90deg, rgba(21, 101, 192, 0.15), rgba(33, 150, 243, 0.08)) !important;
+    box-shadow: inset 3px 0 0 0 #1565c0;
+  }
+}
+/* Clear highlighting after 5 seconds */
+.highlight-report.fade-out {
+  animation: fadeOutHighlight 0.5s ease-in-out forwards;
+}
+@keyframes fadeOutHighlight {
+  from {
+    background: linear-gradient(90deg, rgba(21, 101, 192, 0.15), rgba(33, 150, 243, 0.08)) !important;
+    box-shadow: inset 3px 0 0 0 #1565c0;
+  }
+  to {
+    background: transparent;
+    box-shadow: none;
+  }
 }
 </style>
