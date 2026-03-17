@@ -154,6 +154,8 @@ function resetZoom() {
 const showAssignDialog = ref(false)
 const selectedReportForAssign = ref(null)
 const assignedPersonnel = ref('')
+const showMapAssignDialog = ref(false)
+const mapAssignedPersonnel = ref('')
 const personnelOptions = ['Maintenance Team A', 'Maintenance Team B', 'Maintenance Team C']
 // ── Data Loading ────────────────────────────────────────
 async function loadReports() {
@@ -390,25 +392,51 @@ async function updateMapPinStatus() {
     return
   }
 
+  // If changing to ongoing, show personnel assignment dialog
+  if (mapStatusUpdate.value === 'ongoing') {
+    mapAssignedPersonnel.value = selectedMapPin.value.assigned_personnel || ''
+    showMapAssignDialog.value = true
+    return
+  }
+
+  // For other statuses, update directly
+  await performMapStatusUpdate(mapStatusUpdate.value, null)
+}
+
+async function performMapStatusUpdate(status, personnel = null) {
+  if (!selectedMapPin.value) return
+
   try {
+    const updates = {
+      status: status,
+      viewed_by_admin: true,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (personnel) {
+      updates.assigned_personnel = personnel
+    }
+
     const { error } = await supabase
       .from('reports')
-      .update({
-        status: mapStatusUpdate.value,
-        viewed_by_admin: true,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq('id', selectedMapPin.value.id)
 
     if (error) throw error
 
     // Update the local pin data
-    selectedMapPin.value.status = mapStatusUpdate.value
+    selectedMapPin.value.status = status
+    if (personnel) {
+      selectedMapPin.value.assigned_personnel = personnel
+    }
 
     // Update the reports list
     const reportIndex = reports.value.findIndex(r => r.id === selectedMapPin.value.id)
     if (reportIndex !== -1) {
-      reports.value[reportIndex].status = mapStatusUpdate.value
+      reports.value[reportIndex].status = status
+      if (personnel) {
+        reports.value[reportIndex].assigned_personnel = personnel
+      }
     }
 
     showSnackbar('Status updated successfully')
@@ -422,6 +450,22 @@ async function updateMapPinStatus() {
     console.error('Status update error:', err)
     showSnackbar('Error updating status: ' + err.message)
   }
+}
+
+function confirmMapAssign() {
+  if (!mapAssignedPersonnel.value) {
+    showSnackbar('Please select personnel')
+    return
+  }
+  performMapStatusUpdate('ongoing', mapAssignedPersonnel.value)
+  showMapAssignDialog.value = false
+  mapAssignedPersonnel.value = ''
+}
+
+function cancelMapAssign() {
+  showMapAssignDialog.value = false
+  mapAssignedPersonnel.value = ''
+  mapStatusUpdate.value = ''
 }
 // ── Lifecycle ───────────────────────────────────────────
 onMounted(async () => {
@@ -701,11 +745,12 @@ function handleMobileNav(view) {
         <v-card-text v-if="selectedMapPin">
           <p><strong>Consumer:</strong> {{ selectedMapPin.consumerName }}</p>
           <p><strong>Type:</strong> {{ selectedMapPin.type }}</p>
-          <p><strong>Landmark:</strong> {{ selectedMapPin.landmark || 'N/A' }}</p>
-          <p><strong>Current Status:</strong> <v-chip :color="statusColors[selectedMapPin.status]" size="small">{{ selectedMapPin.status }}</v-chip></p>
           <p><strong>Severity:</strong> {{ selectedMapPin.severity || 'N/A' }}</p>
+          <p><strong>Landmark:</strong> {{ selectedMapPin.landmark || 'N/A' }}</p>
           <p><strong>Notes:</strong> {{ selectedMapPin.notes || 'N/A' }}</p>
-          <p><strong>Coordinates:</strong><br/>Lat: {{ selectedMapPin.latitude }}<br/>Lng: {{ selectedMapPin.longitude }}</p>
+          <p><strong>Assigned to:</strong> {{ selectedMapPin.assigned_personnel || 'N/A' }}</p>
+          <p><strong>Current Status:</strong> <v-chip :color="statusColors[selectedMapPin.status]" size="small">{{ selectedMapPin.status }}</v-chip></p>
+          <!-- <p><strong>Coordinates:</strong><br/>Lat: {{ selectedMapPin.latitude }}<br/>Lng: {{ selectedMapPin.longitude }}</p> -->
           
           <v-divider class="my-4" />
           <p class="font-weight-bold mb-2">Update Status</p>
@@ -724,6 +769,27 @@ function handleMobileNav(view) {
           <v-btn color="primary" variant="flat" @click="updateMapPinStatus" :disabled="!mapStatusUpdate">
             <v-icon start>mdi-check</v-icon> Update Status
           </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    <!-- Map Assign Personnel Dialog -->
+    <v-dialog v-model="showMapAssignDialog" max-width="500">
+      <v-card rounded="xl" class="pa-4">
+        <v-card-title class="font-weight-bold">Assign Personnel</v-card-title>
+        <v-divider />
+        <v-card-text>
+          <v-select
+            v-model="mapAssignedPersonnel"
+            :items="personnelOptions"
+            label="Select Personnel"
+            density="compact"
+            hide-details
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="cancelMapAssign">Cancel</v-btn>
+          <v-btn color="primary" @click="confirmMapAssign">Assign</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

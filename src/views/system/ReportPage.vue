@@ -1,9 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDisplay, useTheme } from 'vuetify'
 import { supabase } from '@/utils/supabase'
 import AlertNotification from '@/components/common/AlertNotification.vue'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 const { mobile } = useDisplay()
 const router = useRouter()
 // Vuetify theme helper
@@ -66,7 +68,6 @@ const files = ref([])
 const previews = ref([])
 const latitude = ref(null)
 const longitude = ref(null)
-const fetchingLocation = ref(false)
 const formAction = ref({
   formProcess: false,
   formErrorMessage: '',
@@ -89,24 +90,85 @@ function removePreview(i) {
   previews.value.splice(i, 1)
   files.value.splice(i, 1)
 }
-function captureLocation() {
-  if (!navigator.geolocation) {
-    formAction.value.formErrorMessage = 'Geolocation not supported by this browser.'
+// ── Map Integration for Location Pinning ────────────────
+const mapInstance = ref(null)
+const markerInstance = ref(null)
+const showMapDialog = ref(false)
+
+watch(showMapDialog, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    // Ensure map container is ready and visible
+    const mapContainer = document.getElementById('report-map')
+    if (!mapContainer) return
+    
+    // Initialize map centered on Butuan City
+    mapInstance.value = L.map('report-map', { 
+      preferCanvas: true,
+      zoomControl: true,
+      dragging: true
+    }).setView([8.9731, 125.5244], 13)
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(mapInstance.value)
+    
+    // Reset marker when opening dialog
+    markerInstance.value = null
+    
+    // Wait for dialog to fully render, then trigger map resize
+    await new Promise(resolve => {
+      setTimeout(() => {
+        if (mapInstance.value) {
+          mapInstance.value.invalidateSize(true)
+        }
+        resolve()
+      }, 300)
+    })
+    
+    // If location already has coordinates, show marker
+    if (latitude.value && longitude.value) {
+      const latLng = [latitude.value, longitude.value]
+      markerInstance.value = L.marker(latLng).addTo(mapInstance.value)
+      mapInstance.value.setView(latLng, 15)
+    }
+    
+    // Add click handler to map
+    mapInstance.value.on('click', (e) => {
+      // Remove old marker if exists
+      if (markerInstance.value) {
+        markerInstance.value.remove()
+      }
+      // Add new marker at clicked location
+      markerInstance.value = L.marker(e.latlng).addTo(mapInstance.value)
+    })
+  } else {
+    // Clean up map on dialog close
+    if (mapInstance.value) {
+      mapInstance.value.off('click')
+      mapInstance.value.remove()
+      mapInstance.value = null
+      markerInstance.value = null
+    }
+  }
+})
+
+function saveLocation() {
+  if (!markerInstance.value) {
+    formAction.value.formErrorMessage = 'Please select a location on the map first'
     return
   }
-  fetchingLocation.value = true
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      latitude.value = pos.coords.latitude
-      longitude.value = pos.coords.longitude
-      fetchingLocation.value = false
-    },
-    (err) => {
-      formAction.value.formErrorMessage = 'Could not get location: ' + err.message
-      fetchingLocation.value = false
-    },
-    { enableHighAccuracy: true, timeout: 10000 },
-  )
+  
+  try {
+    const { lat, lng } = markerInstance.value.getLatLng()
+    latitude.value = lat
+    longitude.value = lng
+    showMapDialog.value = false
+    formAction.value.formErrorMessage = ''
+  } catch (err) {
+    console.error('Save location error:', err)
+    formAction.value.formErrorMessage = 'Error saving location'
+  }
 }
 async function submitReport() {
   const isValid = await refVForm.value?.validate()
@@ -260,16 +322,16 @@ const pipeLocationOptions = [
                 <!-- Location -->
                 <div class="my-4">
                   <div class="d-flex align-center gap-3 mb-2 flex-wrap">
-                    <v-btn small @click="captureLocation" :loading="fetchingLocation">
-                      Capture device location
+                    <v-btn small color="info" variant="outlined" @click="showMapDialog = true">
+                      <v-icon start>mdi-map-marker</v-icon> Pin Location on Map
                     </v-btn>
-                    <span v-if="latitude && longitude" class="text-caption">
-                      Lat: {{ latitude.toFixed(6) }}, Lng: {{ longitude.toFixed(6) }}
+                    <span v-if="latitude && longitude" class="text-caption font-weight-medium">
+                      ✓ Location: Lat: {{ latitude.toFixed(6) }}, Lng: {{ longitude.toFixed(6) }}
                     </span>
-                    <span v-else class="text-caption"> No location captured</span>
+                    <span v-else class="text-caption"> No location pinned</span>
                   </div>
                   <small class="text-caption">
-                    If geolocation fails, write the place in Landmark.
+                    Click the button to pin your location on the map. If not available, write the place in Landmark.
                   </small>
                 </div>
                 <!-- File Upload -->
@@ -315,6 +377,24 @@ const pipeLocationOptions = [
       </v-container>
       <!-- Footer Content Inside Main (for mobile) - Outside container -->
     </v-main>
+    <!-- Map Adjustment Dialog -->
+    <v-dialog v-model="showMapDialog" max-width="900">
+      <v-card rounded="xl" class="pa-4">
+        <v-card-title class="font-weight-bold">Pin Location on Map</v-card-title>
+        <v-divider />
+        <v-card-text>
+          <p class="text-caption text-medium-emphasis mb-3">Click on the map to place or move the pin. Then save.</p>
+          <div id="report-map" style="height: 400px; width: 100%; border: 1px solid #ddd; border-radius: 8px; z-index: 0; position: relative;"></div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showMapDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" @click="saveLocation" :disabled="!markerInstance">
+            <v-icon start>mdi-check</v-icon> Save Location
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <!-- Footer (Desktop only) -->
   </v-app>
 </template>

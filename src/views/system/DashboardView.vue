@@ -155,6 +155,12 @@ const statusColors = {
   resolved: 'green',
   rejected: 'red',
 }
+const statusTextColors = {
+  pending: '#FFA726',
+  ongoing: '#42A5F5',
+  resolved: '#66BB6A',
+  rejected: '#EF5350',
+}
 const userName = ref('')
 async function fetchUser() {
   const { data } = await supabase.auth.getUser()
@@ -323,8 +329,9 @@ const avatarColor = computed(() => {
 // ── Map Integration for Pinning ─────────────────────────
 const mapInstance = ref(null)
 const markerInstance = ref(null)
+const showMapDialog = ref(false)
 
-watch(dialog, async (newVal) => {
+watch(showMapDialog, async (newVal) => {
   if (newVal) {
     await nextTick()
     // Ensure map container is ready and visible
@@ -400,6 +407,7 @@ async function savePin() {
     selectedReport.value.latitude = lat
     selectedReport.value.longitude = lng
     showSnackbar('Location pinned successfully')
+    showMapDialog.value = false
     await fetchReports()
   } catch (err) {
     console.error('Save pin error:', err)
@@ -606,8 +614,18 @@ async function savePin() {
                         report.type || 'Other'
                       }}</v-list-item-title>
                       <v-list-item-subtitle class="mt-1">
-                        <div class="text-caption mt-1">
-                          Reported: {{ new Date(report.created_at).toLocaleDateString('en-PH') }}
+                        <div class="d-flex align-center gap-2">
+                          <div class="text-caption">
+                            Reported: {{ new Date(report.created_at).toLocaleDateString('en-PH') }}
+                          </div>
+                          <v-chip
+                            :color="statusColors[report.status]"
+                            label
+                            size="small"
+                            class="text-capitalize"
+                          >
+                            {{ report.status || 'pending' }}
+                          </v-chip>
                         </div>
                       </v-list-item-subtitle>
                       <template v-slot:append>
@@ -918,35 +936,40 @@ async function savePin() {
         <v-card-title class="font-weight-bold">Complaint Details</v-card-title>
         <v-divider />
         <v-card-text>
-          <p><strong>Type:</strong> {{ selectedReport.type || 'N/A' }}</p>
-          <p><strong>Reported by:</strong> {{ userName }}</p>
-          <p><strong>Severity:</strong> {{ selectedReport.severity || 'N/A' }}</p>
-          <p><strong>Landmark:</strong> {{ selectedReport.landmark || selectedReport.location || 'N/A' }}</p>
-          <p>
-            <strong>Coordinates:</strong> Lat: {{ selectedReport.latitude || 'N/A' }} Lng:
-            {{ selectedReport.longitude || 'N/A' }}
-          </p>
-          <p><strong>Notes:</strong> {{ selectedReport.notes || selectedReport.description || 'N/A' }}</p>
-          <p><strong>Assigned to:</strong> {{ selectedReport.assigned_personnel || 'N/A' }}</p>
-          <v-row v-if="selectedReport.images && selectedReport.images.length" dense class="mt-4">
-            <v-col v-for="(img, i) in selectedReport.images" :key="i" cols="12" sm="6">
-              <v-img
-                :src="img"
-                height="140"
-                cover
-                class="rounded cursor-pointer"
-                @click="openImageViewer(img)"
-              />
-            </v-col>
-          </v-row>
-          <!-- Map for Pinning -->
-          <h3 class="mt-6 mb-2">Pin Location on Map</h3>
-          <p class="text-caption text-medium-emphasis mb-3">Click on the map to place or move the pin. Then save.</p>
-          <div id="report-map" style="height: 300px; width: 100%; border: 1px solid #ddd; border-radius: 8px; z-index: 0; position: relative;"></div>
+          <div class="complaint-details-wrapper">
+            <span :style="{ color: statusTextColors[selectedReport.status] || '#999' }" class="status-text-label">
+              {{ (selectedReport.status || 'pending').toUpperCase() }}
+            </span>
+            <div class="complaint-details-content">
+              <p><strong>Type:</strong> {{ selectedReport.type || 'N/A' }}</p>
+              <p><strong>Reported by:</strong> {{ userName }}</p>
+              <p><strong>Severity:</strong> {{ selectedReport.severity || 'N/A' }}</p>
+              <p><strong>Landmark:</strong> {{ selectedReport.landmark || selectedReport.location || 'N/A' }}</p>
+              <p>
+                <strong>Coordinates:</strong> Lat: {{ selectedReport.latitude || 'N/A' }} Lng:
+                {{ selectedReport.longitude || 'N/A' }}
+              </p>
+              <p><strong>Notes:</strong> {{ selectedReport.notes || selectedReport.description || 'N/A' }}</p>
+              <p><strong>Assigned to:</strong> {{ selectedReport.assigned_personnel || 'N/A' }}</p>
+            </div>
+            <v-row v-if="selectedReport.images && selectedReport.images.length" dense class="mt-4">
+              <v-col v-for="(img, i) in selectedReport.images" :key="i" cols="12" sm="6">
+                <v-img
+                  :src="img"
+                  height="140"
+                  cover
+                  class="rounded cursor-pointer"
+                  @click="openImageViewer(img)"
+                />
+              </v-col>
+            </v-row>
+          </div>
         </v-card-text>
         <v-card-actions class="dialog-actions">
           <v-spacer></v-spacer>
-          <v-btn color="primary" variant="flat" @click="savePin" :disabled="!markerInstance">Save Pin</v-btn>
+          <v-btn color="info" variant="outlined" @click="showMapDialog = true">
+            <v-icon start>mdi-map-marker</v-icon> Adjust Map Location
+          </v-btn>
           <v-btn color="primary" text @click="dialog = false">Close</v-btn>
         </v-card-actions>
       </v-card>
@@ -970,6 +993,24 @@ async function savePin() {
           <v-btn icon @click="zoomIn"><v-icon>mdi-magnify-plus</v-icon></v-btn>
           <v-spacer />
           <v-btn variant="text" @click="showImageViewer = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    <!-- Map Adjustment Dialog -->
+    <v-dialog v-model="showMapDialog" max-width="900">
+      <v-card rounded="xl" class="pa-4">
+        <v-card-title class="font-weight-bold">Adjust Map Location</v-card-title>
+        <v-divider />
+        <v-card-text>
+          <p class="text-caption text-medium-emphasis mb-3">Click on the map to place or move the pin. Then save.</p>
+          <div id="report-map" style="height: 400px; width: 100%; border: 1px solid #ddd; border-radius: 8px; z-index: 0; position: relative;"></div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showMapDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" @click="savePin" :disabled="!markerInstance">
+            <v-icon start>mdi-check</v-icon> Save Location
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1247,6 +1288,69 @@ async function savePin() {
 /* Add this to ensure actions are on top */
 .dialog-actions {
   z-index: 10;
+  position: relative;
+}
+/* Report Status Chip Styling */
+.report-status-chip {
+  min-width: 120px !important;
+  padding: 8px 16px !important;
+  font-size: 1.1rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.3s ease;
+}
+.report-status-chip:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
+  transform: scale(1.05);
+}
+/* Complaint Status Chip Styling */
+.complaint-status-chip {
+  min-width: 150px !important;
+  padding: 12px 24px !important;
+  font-size: 1.3rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+  transition: all 0.3s ease;
+}
+.complaint-status-chip:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
+  transform: scale(1.08);
+}
+/* Status Text Label (no button styling) */
+.status-label-container {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-block;
+}
+.status-text-label {
+  font-size: 1.2rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.complaint-details-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.complaint-details-wrapper .status-text-label {
+  position: absolute;
+  top: -8px;
+  right: 0;
+  font-size: 1.1rem;
+  font-weight: bold;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.complaint-details-content {
+  width: 100%;
+}
+.v-card-text {
   position: relative;
 }
 </style>
