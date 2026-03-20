@@ -161,6 +161,12 @@ const statusTextColors = {
   resolved: '#66BB6A',
   rejected: '#EF5350',
 }
+const statusHexColors = {
+  pending: '#FFA726',
+  ongoing: '#42A5F5',
+  resolved: '#66BB6A',
+  rejected: '#EF5350',
+}
 const userName = ref('')
 async function fetchUser() {
   const { data } = await supabase.auth.getUser()
@@ -416,7 +422,7 @@ async function savePin() {
 }
 </script>
 <template>
-  <v-app :theme="theme">
+  <v-app class="dashboard-app" :theme="theme">
     <!-- App Bar -->
     <v-app-bar
       flat
@@ -487,7 +493,7 @@ async function savePin() {
       </div>
     </v-navigation-drawer>
     <!-- Main Content -->
-    <v-main :class="theme === 'light' ? 'bg-grey-lighten-4' : 'bg-grey-darken-4'">
+    <v-main class="dashboard-main" :class="theme === 'light' ? 'bg-grey-lighten-4' : 'bg-grey-darken-4'">
       <v-container fluid class="pa-4 pa-md-6 pb-6 pb-md-10">
         <div class="text-center mb-6 mb-md-8">
           <h2 class="font-weight-bold mb-2" :class="mobile ? 'text-h6' : 'text-h4'">
@@ -500,34 +506,24 @@ async function savePin() {
         <!-- Dashboard -->
         <div v-if="currentView === 'dashboard'">
           <v-card rounded="lg" elevation="2" class="position-relative">
-            <v-card-title class="d-flex align-center justify-space-between py-4 px-6">
-              <div class="text-h6 font-weight-bold">
+            <div class="d-flex align-center justify-space-between py-6 px-6 border-bottom">
+              <div class="text-h5 font-weight-bold">
                 {{ showUpdatedOnly ? 'Updated Reports' : 'My Reports' }}
               </div>
-              <div class="d-flex align-center gap-2">
-                <v-btn v-if="!showUpdatedOnly" icon class="mr-3" @click="showUpdatedReports">
-                  <v-badge
-                    v-if="notificationCount > 0"
-                    :content="notificationCount"
-                    color="error"
-                    floating
-                    overlap
-                  >
-                    <v-icon size="24">mdi-bell-ring</v-icon>
-                  </v-badge>
-                  <v-icon v-else size="24">mdi-bell-ring</v-icon>
-                </v-btn>
+              <v-spacer></v-spacer>
+              <div class="d-flex align-center gap-6">
                 <v-btn
                   color="primary"
                   prepend-icon="mdi-plus"
                   variant="flat"
                   size="large"
                   @click="router.push('/report')"
+                  class="new-report-btn"
                 >
                   New Report
                 </v-btn>
               </div>
-            </v-card-title>
+            </div>
             <v-alert
               v-if="showUpdatedOnly"
               density="compact"
@@ -572,6 +568,19 @@ async function savePin() {
                 <v-chip value="rejected" color="red" variant="flat" size="large"
                   >Rejected <strong class="ml-1">{{ statusCounts.rejected }}</strong></v-chip
                 >
+                <v-spacer />
+                <v-btn v-if="!showUpdatedOnly" icon class="notification-btn" @click="showUpdatedReports">
+                  <v-badge
+                    v-if="notificationCount > 0"
+                    :content="notificationCount"
+                    color="error"
+                    floating
+                    overlap
+                  >
+                    <v-icon size="28">mdi-bell-ring</v-icon>
+                  </v-badge>
+                  <v-icon v-else size="28">mdi-bell-ring</v-icon>
+                </v-btn>
               </v-chip-group>
               <div v-if="!showUpdatedOnly" class="mb-6">
                 <div class="text-subtitle-1 mb-2">Filter by Type</div>
@@ -932,82 +941,142 @@ async function savePin() {
     </v-footer>
     <!-- Report Details Dialog -->
     <v-dialog v-model="dialog" max-width="820">
-      <v-card v-if="selectedReport" rounded="xl" class="pa-4">
-        <v-card-title class="font-weight-bold">Complaint Details</v-card-title>
-        <v-divider />
-        <v-card-text>
-          <div class="complaint-details-wrapper">
-            <span :style="{ color: statusTextColors[selectedReport.status] || '#999' }" class="status-text-label">
+      <v-card v-if="selectedReport" rounded="xl" class="pa-6">
+        <v-card-title class="font-weight-bold mb-4" style="padding: 0;">
+          <v-icon start>mdi-file-document</v-icon>
+          Complaint Details
+        </v-card-title>
+        <div v-if="selectedReport" class="mb-6">
+          <div class="status-badge-large" :style="{ borderColor: statusHexColors[selectedReport.status] }">
+            <div class="status-label-small">STATUS</div>
+            <div class="status-value-large" :style="{ color: statusHexColors[selectedReport.status] }">
               {{ (selectedReport.status || 'pending').toUpperCase() }}
-            </span>
-            <div class="complaint-details-content">
-              <p><strong>Type:</strong> {{ selectedReport.type || 'N/A' }}</p>
-              <p><strong>Reported by:</strong> {{ userName }}</p>
-              <p><strong>Severity:</strong> {{ selectedReport.severity || 'N/A' }}</p>
-              <p><strong>Landmark:</strong> {{ selectedReport.landmark || selectedReport.location || 'N/A' }}</p>
-              <p>
-                <strong>Coordinates:</strong> Lat: {{ selectedReport.latitude || 'N/A' }} Lng:
-                {{ selectedReport.longitude || 'N/A' }}
-              </p>
-              <p><strong>Notes:</strong> {{ selectedReport.notes || selectedReport.description || 'N/A' }}</p>
-              <p><strong>Assigned to:</strong> {{ selectedReport.assigned_personnel || 'N/A' }}</p>
             </div>
-            <v-row v-if="selectedReport.images && selectedReport.images.length" dense class="mt-4">
-              <v-col v-for="(img, i) in selectedReport.images" :key="i" cols="12" sm="6">
-                <v-img
-                  :src="img"
-                  height="140"
-                  cover
-                  class="rounded cursor-pointer"
-                  @click="openImageViewer(img)"
-                />
-              </v-col>
-            </v-row>
+          </div>
+        </div>
+        <v-divider class="mb-4" />
+        <v-card-text class="pa-0">
+          <div class="complaint-details-wrapper">
+            <div class="complaint-details-content">
+              <div class="info-row mb-3">
+                <span class="info-label">Type</span>
+                <span class="info-value">{{ selectedReport.type || 'N/A' }}</span>
+              </div>
+              <div class="info-row mb-3">
+                <span class="info-label">Reported by</span>
+                <span class="info-value">{{ userName }}</span>
+              </div>
+              <div class="info-row mb-3">
+                <span class="info-label">Severity</span>
+                <span class="info-value">{{ selectedReport.severity || 'N/A' }}</span>
+              </div>
+              <div class="info-row mb-3">
+                <span class="info-label">Landmark</span>
+                <span class="info-value">{{ selectedReport.landmark || selectedReport.location || 'N/A' }}</span>
+              </div>
+              <div class="info-row mb-3">
+                <span class="info-label">Assigned to</span>
+                <span class="info-value">{{ selectedReport.assigned_personnel || 'N/A' }}</span>
+              </div>
+              <div class="info-row mb-3">
+                <span class="info-label">Coordinates</span>
+                <span class="info-value text-caption">Lat: {{ selectedReport.latitude || 'N/A' }}<br/>Lng: {{ selectedReport.longitude || 'N/A' }}</span>
+              </div>
+              <div class="info-row text-caption mb-4" v-if="selectedReport.notes">
+                <span class="info-label">Notes</span>
+                <span class="info-value">{{ selectedReport.notes }}</span>
+              </div>
+              <v-divider class="my-4" />
+              <h4 class="text-subtitle-2 font-weight-bold mb-3">
+                <v-icon start x-small>mdi-image-multiple</v-icon>
+                Attached Images
+              </h4>
+              <v-row v-if="selectedReport.images && selectedReport.images.length" dense>
+                <v-col v-for="(img, i) in selectedReport.images" :key="i" cols="12" sm="6">
+                  <v-img
+                    :src="img"
+                    height="140"
+                    cover
+                    class="rounded cursor-pointer"
+                    style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);"
+                    @click="openImageViewer(img)"
+                  />
+                </v-col>
+              </v-row>
+            </div>
           </div>
         </v-card-text>
-        <v-card-actions class="dialog-actions">
+        <v-card-actions class="dialog-actions pt-4">
           <v-spacer></v-spacer>
           <v-btn color="info" variant="outlined" @click="showMapDialog = true">
             <v-icon start>mdi-map-marker</v-icon> Adjust Map Location
           </v-btn>
-          <v-btn color="primary" text @click="dialog = false">Close</v-btn>
+          <v-btn color="primary" variant="flat" @click="dialog = false">
+            <v-icon start>mdi-close</v-icon>
+            Close
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
     <!-- Image Zoom Dialog -->
-    <v-dialog v-model="showImageViewer" max-width="900">
-      <v-card>
+    <v-dialog v-model="showImageViewer" max-width="900" fullscreen>
+      <v-card rounded="xl">
+        <v-card-title class="font-weight-bold d-flex align-center justify-space-between" style="background: linear-gradient(135deg, #1565c0, #1976d2); color: white;">
+          <div>
+            <v-icon start>mdi-image</v-icon>
+            Image Viewer
+          </div>
+          <v-btn icon color="white" @click="showImageViewer = false">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
         <v-card-text
           class="d-flex justify-center align-center"
+          style="height: calc(100vh - 120px); background: rgba(0, 0, 0, 0.05);"
           @wheel.prevent="(e) => (e.deltaY < 0 ? zoomIn() : zoomOut())"
         >
           <img
             :src="activeImage"
             class="zoomable-image"
-            :style="{ transform: `scale(${zoomLevel})` }"
+            :style="{ transform: `scale(${zoomLevel})`, boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)' }"
           />
         </v-card-text>
-        <v-card-actions>
-          <v-btn icon @click="zoomOut"><v-icon>mdi-magnify-minus</v-icon></v-btn>
-          <v-btn icon @click="resetZoom"><v-icon>mdi-magnify</v-icon></v-btn>
-          <v-btn icon @click="zoomIn"><v-icon>mdi-magnify-plus</v-icon></v-btn>
+        <v-card-actions class="justify-center pa-4" style="background: linear-gradient(135deg, rgba(21, 101, 192, 0.1), rgba(33, 150, 243, 0.08));">
+          <v-btn color="primary" icon @click="zoomOut">
+            <v-icon>mdi-magnify-minus</v-icon>
+          </v-btn>
+          <v-btn color="primary" icon @click="resetZoom">
+            <v-icon>mdi-magnify</v-icon>
+          </v-btn>
+          <v-btn color="primary" icon @click="zoomIn">
+            <v-icon>mdi-magnify-plus</v-icon>
+          </v-btn>
           <v-spacer />
-          <v-btn variant="text" @click="showImageViewer = false">Close</v-btn>
+          <v-btn color="primary" variant="flat" @click="showImageViewer = false">
+            <v-icon start>mdi-close</v-icon>
+            Close
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
     <!-- Map Adjustment Dialog -->
     <v-dialog v-model="showMapDialog" max-width="900">
-      <v-card rounded="xl" class="pa-4">
-        <v-card-title class="font-weight-bold">Adjust Map Location</v-card-title>
-        <v-divider />
-        <v-card-text>
-          <p class="text-caption text-medium-emphasis mb-3">Click on the map to place or move the pin. Then save.</p>
-          <div id="report-map" style="height: 400px; width: 100%; border: 1px solid #ddd; border-radius: 8px; z-index: 0; position: relative;"></div>
+      <v-card rounded="xl" class="pa-6">
+        <v-card-title class="font-weight-bold mb-4" style="padding: 0;">
+          <v-icon start>mdi-map-marker</v-icon>
+          Adjust Map Location
+        </v-card-title>
+        <v-divider class="mb-4" />
+        <v-card-text class="pa-0">
+          <p class="text-caption text-medium-emphasis mb-4">Click on the map to place or move the pin. Then save.</p>
+          <div id="report-map" style="height: 400px; width: 100%; border: 2px solid rgba(21, 101, 192, 0.2); border-radius: 12px; z-index: 0; position: relative;"></div>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="pt-4">
           <v-spacer />
-          <v-btn variant="text" @click="showMapDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="outlined" @click="showMapDialog = false">
+            <v-icon start>mdi-close</v-icon>
+            Cancel
+          </v-btn>
           <v-btn color="primary" variant="flat" @click="savePin" :disabled="!markerInstance">
             <v-icon start>mdi-check</v-icon> Save Location
           </v-btn>
@@ -1015,9 +1084,14 @@ async function savePin() {
       </v-card>
     </v-dialog>
     <!-- Snackbar -->
-    <v-snackbar v-model="snackbar" timeout="2000" color="success" location="bottom">{{
-      snackbarMessage
-    }}</v-snackbar>
+    <v-snackbar v-model="snackbar" timeout="2000" location="bottom">
+      <template #default>
+        <div class="d-flex align-center gap-2">
+          <v-icon color="success">mdi-check-circle</v-icon>
+          {{ snackbarMessage }}
+        </div>
+      </template>
+    </v-snackbar>
   </v-app>
 </template>
 <style scoped>
@@ -1159,7 +1233,34 @@ async function savePin() {
 .footer-mobile-content {
   width: 100%;
 }
-/* Consumer header depth */
+
+.dashboard-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-app > .v-main {
+  flex: 1;
+}
+
+  .v-application .v-main__wrap {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .v-main {
+    flex: 1;
+    min-height: calc(100vh - 64px) !important;
+  }
+
+  .dashboard-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
 .consumer-header {
   position: relative;
   padding: 0 !important;
@@ -1353,4 +1454,318 @@ async function savePin() {
 .v-card-text {
   position: relative;
 }
+
+/* ============================= */
+/* MODERN UI ENHANCEMENTS */
+/* ============================= */
+
+/* Cards */
+.v-card {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+  transition: all 0.3s ease;
+}
+
+.v-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+.v-card.modern-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85)) !important;
+  border: 1px solid rgba(21, 101, 192, 0.1);
+}
+
+.v-theme--dark .v-card.modern-card {
+  background: linear-gradient(135deg, rgba(30, 30, 30, 0.9), rgba(35, 35, 35, 0.85)) !important;
+  border: 1px solid rgba(33, 150, 243, 0.15);
+}
+
+/* Chips */
+.v-chip {
+  font-weight: 600 !important;
+  letter-spacing: 0.3px;
+  border-radius: 8px !important;
+  transition: all 0.3s ease;
+}
+
+.v-chip-group .v-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.v-chip-group .v-chip.v-chip--selected {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Buttons */
+.v-btn {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  text-transform: capitalize !important;
+  transition: all 0.3s ease !important;
+}
+
+.v-btn--flat {
+  background: linear-gradient(135deg, #1565c0, #1976d2) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3) !important;
+}
+
+.v-btn--flat:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px rgba(21, 101, 192, 0.4) !important;
+}
+
+.v-btn--outlined {
+  border: 2px solid #1565c0 !important;
+  color: #1565c0 !important;
+}
+
+.v-btn--outlined:hover {
+  background: rgba(21, 101, 192, 0.08) !important;
+  border-color: #1976d2 !important;
+  transform: translateY(-2px);
+}
+
+/* Text Fields and Selects */
+.v-input__control .v-field {
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 2px solid rgba(21, 101, 192, 0.2) !important;
+  transition: all 0.2s ease;
+}
+
+.v-input__control .v-field:hover {
+  border: 2px solid rgba(21, 101, 192, 0.4) !important;
+  background: rgba(21, 101, 192, 0.04) !important;
+}
+
+.v-input__control .v-field.v-field--focused {
+  border: 2px solid #1565c0 !important;
+  background: rgba(21, 101, 192, 0.08) !important;
+  box-shadow: 0 0 12px rgba(21, 101, 192, 0.2);
+}
+
+.v-theme--dark .v-input__control .v-field {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 2px solid rgba(33, 150, 243, 0.2) !important;
+}
+
+/* Dialog Cards */
+.v-dialog__content .v-card {
+  border-radius: 16px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+}
+
+.v-card-title {
+  background: linear-gradient(135deg, #1565c0, #1976d2) !important;
+  color: white !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  padding: 20px 24px !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+
+/* List Items */
+.v-list-item {
+  border-radius: 8px !important;
+  margin: 4px 8px;
+  transition: all 0.2s ease;
+}
+
+.v-list-item:hover {
+  background: rgba(21, 101, 192, 0.08);
+  transform: translateX(4px);
+}
+
+.v-list-item.v-list-item--active {
+  background: linear-gradient(135deg, rgba(21, 101, 192, 0.15), rgba(33, 150, 243, 0.08)) !important;
+  border-left: 4px solid #1565c0;
+  color: #1565c0 !important;
+}
+
+/* Status Badge Large */
+.status-badge-large {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 32px;
+  border: 3px solid;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(21, 101, 192, 0.05), rgba(33, 150, 243, 0.03));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.status-badge-large:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.v-theme--dark .status-badge-large {
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.08), rgba(33, 150, 243, 0.04));
+}
+
+.status-label-small {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.54);
+  margin-bottom: 8px;
+}
+
+.v-theme--dark .status-label-small {
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.status-value-large {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Info Rows */
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(21, 101, 192, 0.04);
+  border-left: 3px solid #1565c0;
+}
+
+.v-theme--dark .info-row {
+  background: rgba(33, 150, 243, 0.08);
+  border-left: 3px solid #42a5f5;
+}
+
+.info-label {
+  font-weight: 600;
+  color: #1565c0;
+  min-width: 180px;
+}
+
+.v-theme--dark .info-label {
+  color: #42a5f5;
+}
+
+.info-value {
+  flex: 1;
+  text-align: right;
+  color: rgba(0, 0, 0, 0.87);
+  padding-left: 12px;
+}
+
+.v-theme--dark .info-value {
+  color: rgba(255, 255, 255, 0.87);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #1565c0, #1976d2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #1976d2, #2196F3);
+}
+
+.v-theme--dark ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Smooth transitions */
+.v-card,
+.v-btn,
+.v-chip,
+.v-list-item {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.v-theme--dark .empty-state {
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.empty-state .v-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+
+/* Mobile optimization */
+@media (max-width: 600px) {
+  .v-card {
+    border-radius: 10px !important;
+  }
+
+  .status-badge-large {
+    padding: 16px 24px;
+  }
+
+  .status-value-large {
+    font-size: 1.5rem;
+  }
+
+  .info-label {
+    min-width: 120px;
+  }
+}
+
+/* Dashboard Header */
+.border-bottom {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.v-theme--dark .border-bottom {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Notification Button */
+.notification-btn {
+  transition: all 0.3s ease;
+}
+
+.notification-btn:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px rgba(21, 101, 192, 0.3);
+}
+
+/* New Report Button */
+.new-report-btn {
+  min-width: 140px !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: 0 4px 16px rgba(21, 101, 192, 0.3) !important;
+}
+
+.new-report-btn:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 8px 24px rgba(21, 101, 192, 0.4) !important;
+}
+
 </style>

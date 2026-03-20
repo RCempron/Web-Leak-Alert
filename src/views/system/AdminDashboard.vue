@@ -111,6 +111,12 @@ const statusColors = {
   Resolved: 'success',
   Rejected: 'error',
 }
+const statusHexColors = {
+  pending: '#FFA726',
+  ongoing: '#42A5F5',
+  resolved: '#66BB6A',
+  rejected: '#EF5350',
+}
 const filteredReports = computed(() => {
   let list = reports.value
   if (search.value.trim()) {
@@ -242,6 +248,9 @@ async function initializeMap() {
     preferCanvas: true,
     zoomControl: true,
     dragging: true,
+    minZoom: 1,
+    maxZoom: 25,
+    scrollWheelZoom: true,
   }).setView([8.9731, 125.5244], 13)
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -316,6 +325,31 @@ async function loadMapPins() {
           <small>Status: <strong style="color: ${statusColor};">${report.status}</strong></small>
         </div>
       `)
+
+    // Function to update marker size based on zoom
+    function updateMarkerSize() {
+      const zoom = mapInstance.value.getZoom()
+      let markerRadius = 16
+      let glowRadius = 20
+      
+      // Scale up markers when zoomed in
+      if (zoom >= 18) {
+        markerRadius = 24
+        glowRadius = 28
+      } else if (zoom >= 16) {
+        markerRadius = 20
+        glowRadius = 24
+      } else if (zoom <= 10) {
+        markerRadius = 12
+        glowRadius = 16
+      }
+      
+      marker.setRadius(markerRadius)
+      glowMarker.setRadius(glowRadius)
+    }
+
+    // Update marker size on map zoom
+    mapInstance.value.on('zoom', updateMarkerSize)
 
     // Add hover effects
     marker.on('mouseover', function() {
@@ -560,20 +594,28 @@ function handleMobileNav(view) {
       <v-container fluid class="pa-4 pa-md-6 pb-6 pb-md-10">
         <!-- Dashboard View -->
         <div v-if="currentView === 'dashboard'">
-          <!-- ... unchanged dashboard content ... -->
-          <v-card flat class="mb-4">
-            <v-card-text>
-              <v-chip-group v-model="selectedStatus" mandatory>
+          <!-- Filter Section -->
+          <v-card flat class="mb-6 filter-section">
+            <v-card-text class="pa-6">
+              <div class="d-flex align-center justify-space-between mb-4">
+                <h3 class="text-h6 font-weight-bold">Filter Complaints</h3>
+                <v-chip color="info" class="info-badge">
+                  <v-icon start small>mdi-file-document</v-icon>
+                  {{ filteredReports.length }} Total
+                </v-chip>
+              </div>
+              <v-chip-group v-model="selectedStatus" mandatory class="mb-4">
                 <v-chip v-for="s in statuses" :key="s" :value="s" :color="statusColors[s]">
                   {{ s }}
                 </v-chip>
               </v-chip-group>
               <v-text-field
                 v-model="search"
-                label="Search reports"
+                label="Search reports by type, landmark..."
                 prepend-inner-icon="mdi-magnify"
-                density="compact"
-                class="mt-3"
+                density="comfortable"
+                class="search-field"
+                clearable
               />
             </v-card-text>
           </v-card>
@@ -611,11 +653,20 @@ function handleMobileNav(view) {
                   />
                 </td>
                 <td>
-                  <div class="d-flex align-center gap-4">
-                    <v-btn size="small" color="primary" @click="openReportDetails(item)">
-                      View details
+                  <div class="action-buttons">
+                    <v-btn 
+                      size="small" 
+                      color="primary" 
+                      variant="flat"
+                      @click="openReportDetails(item)"
+                    >
+                      <v-icon start small>mdi-eye</v-icon>
+                      View
                     </v-btn>
-                    <v-chip v-if="!item.viewed_by_admin" color="error" size="small" label>NEW</v-chip>
+                    <v-chip v-if="!item.viewed_by_admin" color="error" size="small" label>
+                      <v-icon start x-small>mdi-star</v-icon>
+                      NEW
+                    </v-chip>
                   </div>
                 </td>
               </tr>
@@ -707,7 +758,7 @@ function handleMobileNav(view) {
               </v-list-group>
             </v-list>
             <div class="button-group d-flex flex-wrap justify-center align-center mt-6">
-              <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'">
+              <v-btn color="primary" variant="outlined" size="large" @click="currentView = 'dashboard'">
                 <v-icon start>mdi-arrow-left</v-icon> Back to Dashboard
               </v-btn>
             </div>
@@ -715,21 +766,27 @@ function handleMobileNav(view) {
         </div>
         <!-- Map View -->
         <div v-else-if="currentView === 'map'" style="height: calc(100vh - 200px)">
-          <v-card flat style="height: 100%; display: flex; flex-direction: column">
-            <v-card-title class="font-weight-bold d-flex align-center justify-space-between">
-              <span>Consumer Reports Map</span>
+          <v-card flat style="height: 100%; display: flex; flex-direction: column; border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);">
+            <v-card-title class="font-weight-bold d-flex align-center justify-space-between" style="background: linear-gradient(135deg, #1565c0, #1976d2); color: white;">
+              <div class="d-flex align-center gap-3">
+                <v-icon start>mdi-map-marker-multiple</v-icon>
+                <span>Consumer Reports Map</span>
+              </div>
               <v-chip 
-                color="info" 
-                variant="outlined"
+                color="white" 
+                text-color="primary"
+                class="info-badge"
                 :label="`${reportsWithCoordinates.length} Pins`"
-              />
+              >
+                <v-icon start small>mdi-pin</v-icon>
+              </v-chip>
             </v-card-title>
             <v-divider />
             <v-card-text style="flex: 1; padding: 0; overflow: hidden">
-              <div id="admin-report-map" style="width: 100%; height: 100%; border-radius: 8px 8px 0 0"></div>
+              <div id="admin-report-map" style="width: 100%; height: 100%; border-radius: 0 0 16px 16px;"></div>
             </v-card-text>
-            <v-card-actions>
-              <v-btn variant="outlined" @click="currentView = 'dashboard'">
+            <v-card-actions class="pa-4">
+              <v-btn color="primary" variant="outlined" @click="currentView = 'dashboard'">
                 <v-icon start>mdi-arrow-left</v-icon> Back to Dashboard
               </v-btn>
             </v-card-actions>
@@ -738,34 +795,89 @@ function handleMobileNav(view) {
       </v-container>
     </v-main>
     <!-- Pin Details Dialog -->
-    <v-dialog v-model="showPinDetails" max-width="500">
-      <v-card rounded="xl" class="pa-4">
-        <v-card-title class="font-weight-bold">Pin Details</v-card-title>
-        <v-divider />
-        <v-card-text v-if="selectedMapPin">
-          <p><strong>Consumer:</strong> {{ selectedMapPin.consumerName }}</p>
-          <p><strong>Type:</strong> {{ selectedMapPin.type }}</p>
-          <p><strong>Severity:</strong> {{ selectedMapPin.severity || 'N/A' }}</p>
-          <p><strong>Landmark:</strong> {{ selectedMapPin.landmark || 'N/A' }}</p>
-          <p><strong>Notes:</strong> {{ selectedMapPin.notes || 'N/A' }}</p>
-          <p><strong>Assigned to:</strong> {{ selectedMapPin.assigned_personnel || 'N/A' }}</p>
-          <p><strong>Current Status:</strong> <v-chip :color="statusColors[selectedMapPin.status]" size="small">{{ selectedMapPin.status }}</v-chip></p>
-          <!-- <p><strong>Coordinates:</strong><br/>Lat: {{ selectedMapPin.latitude }}<br/>Lng: {{ selectedMapPin.longitude }}</p> -->
+    <v-dialog v-model="showPinDetails" max-width="520">
+      <v-card rounded="xl" class="pa-6">
+        <div class="d-flex align-center justify-space-between mb-6">
+          <v-card-title class="font-weight-bold" style="padding: 0;">
+            <v-icon start>mdi-map-pin</v-icon>
+            Pin Details
+          </v-card-title>
+        </div>
+        <div v-if="selectedMapPin" class="mb-6">
+          <div class="status-badge-large" :style="{ borderColor: statusHexColors[selectedMapPin.status] }">
+            <div class="status-label-small">STATUS</div>
+            <div class="status-value-large" :style="{ color: statusHexColors[selectedMapPin.status] }">
+              {{ (selectedMapPin.status || 'pending').toUpperCase() }}
+            </div>
+          </div>
+        </div>
+        <v-divider class="mb-4" />
+        <v-card-text v-if="selectedMapPin" class="pa-0">
+          <div class="info-row mb-3">
+            <div class="info-label">
+              <v-icon small>mdi-account</v-icon>
+              <span class="ml-2">Consumer</span>
+            </div>
+            <span class="info-value font-weight-600">{{ selectedMapPin.consumerName }}</span>
+          </div>
+          <div class="info-row mb-3">
+            <div class="info-label">
+              <v-icon small>mdi-format-list-bulleted</v-icon>
+              <span class="ml-2">Type</span>
+            </div>
+            <span class="info-value">{{ selectedMapPin.type }}</span>
+          </div>
+          <div class="info-row mb-3">
+            <div class="info-label">
+              <v-icon small>mdi-alert</v-icon>
+              <span class="ml-2">Severity</span>
+            </div>
+            <span class="info-value">{{ selectedMapPin.severity || 'N/A' }}</span>
+          </div>
+          <div class="info-row mb-3">
+            <div class="info-label">
+              <v-icon small>mdi-map-marker</v-icon>
+              <span class="ml-2">Landmark</span>
+            </div>
+            <span class="info-value">{{ selectedMapPin.landmark || 'N/A' }}</span>
+          </div>
+          <div class="info-row mb-3">
+            <div class="info-label">
+              <v-icon small>mdi-account-hard-hat</v-icon>
+              <span class="ml-2">Assigned to</span>
+            </div>
+            <span class="info-value">{{ selectedMapPin.assigned_personnel || 'N/A' }}</span>
+          </div>
+          <div class="info-row mb-4">
+            <div class="info-label">
+              <v-icon small>mdi-note-text</v-icon>
+              <span class="ml-2">Notes</span>
+            </div>
+            <span class="info-value text-caption">{{ selectedMapPin.notes || 'N/A' }}</span>
+          </div>
           
           <v-divider class="my-4" />
-          <p class="font-weight-bold mb-2">Update Status</p>
-          <v-select
-            v-model="mapStatusUpdate"
-            :items="['pending', 'ongoing', 'resolved', 'rejected']"
-            label="Select new status"
-            density="compact"
-            outlined
-            hide-details
-          />
+          <div class="mb-3">
+            <label class="text-subtitle-2 font-weight-bold d-block mb-2">
+              <v-icon small>mdi-sync</v-icon>
+              <span class="ml-2">Update Status</span>
+            </label>
+            <v-select
+              v-model="mapStatusUpdate"
+              :items="['pending', 'ongoing', 'resolved', 'rejected']"
+              label="Select new status"
+              density="compact"
+              outlined
+              hide-details
+            />
+          </div>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="pt-4">
           <v-spacer />
-          <v-btn variant="text" @click="showPinDetails = false">Close</v-btn>
+          <v-btn color="primary" variant="outlined" @click="showPinDetails = false">
+            <v-icon start>mdi-close</v-icon>
+            Cancel
+          </v-btn>
           <v-btn color="primary" variant="flat" @click="updateMapPinStatus" :disabled="!mapStatusUpdate">
             <v-icon start>mdi-check</v-icon> Update Status
           </v-btn>
@@ -774,10 +886,13 @@ function handleMobileNav(view) {
     </v-dialog>
     <!-- Map Assign Personnel Dialog -->
     <v-dialog v-model="showMapAssignDialog" max-width="500">
-      <v-card rounded="xl" class="pa-4">
-        <v-card-title class="font-weight-bold">Assign Personnel</v-card-title>
-        <v-divider />
-        <v-card-text>
+      <v-card rounded="xl" class="pa-6">
+        <v-card-title class="font-weight-bold mb-4" style="padding: 0;">
+          <v-icon start>mdi-account-hard-hat</v-icon>
+          Assign Personnel
+        </v-card-title>
+        <v-divider class="mb-4" />
+        <v-card-text class="pa-0">
           <v-select
             v-model="mapAssignedPersonnel"
             :items="personnelOptions"
@@ -795,82 +910,157 @@ function handleMobileNav(view) {
     </v-dialog>
     <!-- Dialogs and Snackbar unchanged -->
     <v-dialog v-model="showReportDialog" max-width="820">
-      <v-card rounded="xl" class="pa-4">
-        <v-card-title class="font-weight-bold">Complaint Details</v-card-title>
-        <v-divider />
-        <v-card-text v-if="selectedReport">
-          <p><strong>Type:</strong> {{ selectedReport.type }}</p>
-          <p><strong>Reported by:</strong> {{ reporterName }}</p>
-          <p><strong>Severity:</strong> {{ selectedReport.severity || 'N/A' }}</p>
-          <p><strong>Landmark:</strong> {{ selectedReport.landmark || 'N/A' }}</p>
-          <p>
-            <strong>Coordinates:</strong> Lat: {{ selectedReport.latitude || 'N/A' }} Lng:
-            {{ selectedReport.longitude || 'N/A' }}
-          </p>
-          <p><strong>Notes:</strong> {{ selectedReport.notes || 'N/A' }}</p>
-          <p><strong>Assigned to:</strong> {{ selectedReport.assigned_personnel || 'N/A' }}</p>
-          <v-row dense class="mt-4">
+      <v-card rounded="xl" class="pa-6">
+        <v-card-title class="font-weight-bold mb-4" style="padding: 0;">
+          <v-icon start>mdi-file-document</v-icon>
+          Complaint Details
+        </v-card-title>
+        <div v-if="selectedReport" class="mb-6">
+          <div class="status-badge-large" :style="{ borderColor: statusHexColors[selectedReport.status] }">
+            <div class="status-label-small">STATUS</div>
+            <div class="status-value-large" :style="{ color: statusHexColors[selectedReport.status] }">
+              {{ (selectedReport.status || 'pending').toUpperCase() }}
+            </div>
+          </div>
+        </div>
+        <v-divider class="mb-4" />
+        <v-card-text v-if="selectedReport" class="pa-0">
+          <div class="info-row mb-3">
+            <span class="info-label">Type</span>
+            <span class="info-value">{{ selectedReport.type }}</span>
+          </div>
+          <div class="info-row mb-3">
+            <span class="info-label">Reported by</span>
+            <span class="info-value">{{ reporterName }}</span>
+          </div>
+          <div class="info-row mb-3">
+            <span class="info-label">Severity</span>
+            <span class="info-value">{{ selectedReport.severity || 'N/A' }}</span>
+          </div>
+          <div class="info-row mb-3">
+            <span class="info-label">Landmark</span>
+            <span class="info-value">{{ selectedReport.landmark || 'N/A' }}</span>
+          </div>
+          <div class="info-row mb-3">
+            <span class="info-label">Assigned to</span>
+            <span class="info-value">{{ selectedReport.assigned_personnel || 'N/A' }}</span>
+          </div>
+          <div class="info-row mb-3">
+            <span class="info-label">Coordinates</span>
+            <span class="info-value text-caption">Lat: {{ selectedReport.latitude || 'N/A' }}<br/>Lng: {{ selectedReport.longitude || 'N/A' }}</span>
+          </div>
+          <div class="info-row text-caption mb-4" v-if="selectedReport.notes">
+            <span class="info-label">Notes</span>
+            <span class="info-value">{{ selectedReport.notes }}</span>
+          </div>
+
+          <v-divider class="my-4" />
+          <h4 class="text-subtitle-2 font-weight-bold mb-3">
+            <v-icon start x-small>mdi-image-multiple</v-icon>
+            Attached Images
+          </h4>
+          <v-row dense>
             <v-col v-for="(img, i) in selectedReport.images || []" :key="i" cols="12" sm="6">
               <v-img
                 :src="img"
                 height="140"
                 cover
                 class="rounded cursor-pointer"
+                style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);"
                 @click="openImageViewer(img)"
               />
             </v-col>
           </v-row>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="pt-4">
           <v-spacer />
-          <v-btn variant="text" @click="showReportDialog = false">Close</v-btn>
+          <v-btn color="primary" variant="flat" @click="showReportDialog = false">
+            <v-icon start>mdi-close</v-icon>
+            Close
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
-    <v-dialog v-model="showImageViewer" max-width="900">
-      <v-card>
+    <v-dialog v-model="showImageViewer" max-width="900" fullscreen>
+      <v-card rounded="xl">
+        <v-card-title class="font-weight-bold d-flex align-center justify-space-between" style="background: linear-gradient(135deg, #1565c0, #1976d2); color: white;">
+          <div>
+            <v-icon start>mdi-image</v-icon>
+            Image Viewer
+          </div>
+          <v-btn icon color="white" @click="showImageViewer = false">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
         <v-card-text
           class="d-flex justify-center align-center"
+          style="height: calc(100vh - 120px); background: rgba(0, 0, 0, 0.05);"
           @wheel.prevent="(e) => (e.deltaY < 0 ? zoomIn() : zoomOut())"
         >
           <img
             :src="activeImage"
             class="zoomable-image"
-            :style="{ transform: `scale(${zoomLevel})` }"
+            :style="{ transform: `scale(${zoomLevel})`, boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)' }"
           />
         </v-card-text>
-        <v-card-actions>
-          <v-btn icon @click="zoomOut"><v-icon>mdi-magnify-minus</v-icon></v-btn>
-          <v-btn icon @click="resetZoom"><v-icon>mdi-magnify</v-icon></v-btn>
-          <v-btn icon @click="zoomIn"><v-icon>mdi-magnify-plus</v-icon></v-btn>
+        <v-card-actions class="justify-center pa-4" style="background: linear-gradient(135deg, rgba(21, 101, 192, 0.1), rgba(33, 150, 243, 0.08));">
+          <v-btn color="primary" icon @click="zoomOut">
+            <v-icon>mdi-magnify-minus</v-icon>
+          </v-btn>
+          <v-btn color="primary" icon @click="resetZoom">
+            <v-icon>mdi-magnify</v-icon>
+          </v-btn>
+          <v-btn color="primary" icon @click="zoomIn">
+            <v-icon>mdi-magnify-plus</v-icon>
+          </v-btn>
           <v-spacer />
-          <v-btn variant="text" @click="showImageViewer = false">Close</v-btn>
+          <v-btn color="primary" variant="flat" @click="showImageViewer = false">
+            <v-icon start>mdi-close</v-icon>
+            Close
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
     <!-- Assign Personnel Dialog -->
     <v-dialog v-model="showAssignDialog" max-width="500">
-      <v-card rounded="xl" class="pa-4">
-        <v-card-title class="font-weight-bold">Assign Personnel</v-card-title>
-        <v-divider />
-        <v-card-text>
+      <v-card rounded="xl" class="pa-6">
+        <v-card-title class="font-weight-bold mb-4" style="padding: 0;">
+          <v-icon start>mdi-account-multiple</v-icon>
+          Assign Personnel
+        </v-card-title>
+        <v-divider class="mb-4" />
+        <v-card-text class="pa-0">
+          <p class="text-caption text-medium-emphasis mb-3">Select a team member to handle this complaint</p>
           <v-select
             v-model="assignedPersonnel"
             :items="personnelOptions"
             label="Select Personnel"
-            density="compact"
+            density="comfortable"
             hide-details
+            outlined
           />
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="pt-6">
           <v-spacer />
-          <v-btn variant="text" @click="cancelAssign">Cancel</v-btn>
-          <v-btn color="primary" @click="confirmAssign">Assign</v-btn>
+          <v-btn variant="outlined" @click="cancelAssign">
+            <v-icon start>mdi-close</v-icon>
+            Cancel
+          </v-btn>
+          <v-btn color="primary" variant="flat" @click="confirmAssign">
+            <v-icon start>mdi-check</v-icon>
+            Assign
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
-    <v-snackbar v-model="snackbar" timeout="2000" color="success" location="bottom">
-      {{ snackbarMessage }}
+    <!-- Snackbar -->
+    <v-snackbar v-model="snackbar" timeout="2000" location="bottom">
+      <template #default>
+        <div class="d-flex align-center gap-2">
+          <v-icon color="success">mdi-check-circle</v-icon>
+          {{ snackbarMessage }}
+        </div>
+      </template>
     </v-snackbar>
   </v-app>
 </template>
@@ -1048,4 +1238,484 @@ function handleMobileNav(view) {
     box-shadow: none;
   }
 }
+/* ============================= */
+/* MODERN UI ENHANCEMENTS */
+/* ============================= */
+
+/* Data Table Styling */
+.v-data-table {
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+}
+
+.v-data-table thead {
+  background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%) !important;
+  color: white !important;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.v-data-table tbody tr {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.2s ease;
+}
+
+.v-data-table tbody tr:hover {
+  background-color: rgba(21, 101, 192, 0.04) !important;
+  transform: scale(1.01);
+  box-shadow: inset 0 0 8px rgba(21, 101, 192, 0.08);
+}
+
+.v-theme--dark .v-data-table tbody tr:hover {
+  background-color: rgba(33, 150, 243, 0.08) !important;
+}
+
+/* Status Chips */
+.v-chip {
+  font-weight: 600 !important;
+  letter-spacing: 0.3px;
+  border-radius: 8px !important;
+  min-width: 90px;
+  text-align: center;
+}
+
+/* Filter Chips */
+.v-chip-group .v-chip {
+  border-radius: 8px !important;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.v-chip-group .v-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.v-chip-group .v-chip.v-chip--selected {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Card Improvements */
+.v-card {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+.v-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+  transition: all 0.3s ease;
+}
+
+.v-card.modern-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85)) !important;
+  border: 1px solid rgba(21, 101, 192, 0.1);
+}
+
+.v-theme--dark .v-card.modern-card {
+  background: linear-gradient(135deg, rgba(30, 30, 30, 0.9), rgba(35, 35, 35, 0.85)) !important;
+  border: 1px solid rgba(33, 150, 243, 0.15);
+}
+
+/* Text Fields and Selects */
+.v-input__control,
+.v-select,
+.v-text-field {
+  border-radius: 8px !important;
+}
+
+.v-input__control .v-field {
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 2px solid rgba(21, 101, 192, 0.2) !important;
+  transition: all 0.2s ease;
+}
+
+.v-input__control .v-field:hover {
+  border: 2px solid rgba(21, 101, 192, 0.4) !important;
+  background: rgba(21, 101, 192, 0.04) !important;
+}
+
+.v-input__control .v-field.v-field--focused {
+  border: 2px solid #1565c0 !important;
+  background: rgba(21, 101, 192, 0.08) !important;
+  box-shadow: 0 0 12px rgba(21, 101, 192, 0.2);
+}
+
+.v-theme--dark .v-input__control .v-field {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 2px solid rgba(33, 150, 243, 0.2) !important;
+}
+
+.v-theme--dark .v-input__control .v-field:hover {
+  border: 2px solid rgba(33, 150, 243, 0.4) !important;
+  background: rgba(33, 150, 243, 0.08) !important;
+}
+
+/* Buttons */
+.v-btn {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  text-transform: capitalize !important;
+  transition: all 0.3s ease !important;
+}
+
+.v-btn--flat {
+  background: linear-gradient(135deg, #1565c0, #1976d2) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3) !important;
+}
+
+.v-btn--flat:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px rgba(21, 101, 192, 0.4) !important;
+}
+
+.v-btn--outlined {
+  border: 2px solid #1565c0 !important;
+  color: #1565c0 !important;
+}
+
+.v-btn--outlined:hover {
+  background: rgba(21, 101, 192, 0.08) !important;
+  border-color: #1976d2 !important;
+  transform: translateY(-2px);
+}
+
+.v-btn--text {
+  color: #1565c0 !important;
+  font-weight: 600 !important;
+}
+
+.v-btn--text:hover {
+  background: rgba(21, 101, 192, 0.08) !important;
+}
+
+/* Dialog Improvements */
+.v-dialog__content .v-card {
+  border-radius: 16px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+}
+
+.v-card-title {
+  background: linear-gradient(135deg, #1565c0, #1976d2) !important;
+  color: white !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  padding: 20px 24px !important;
+}
+
+.v-card-text {
+  padding: 24px !important;
+  line-height: 1.8;
+}
+
+.v-card-text p {
+  margin: 12px 0 !important;
+  font-size: 0.95rem;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.v-theme--dark .v-card-text p {
+  color: rgba(255, 255, 255, 0.87);
+}
+
+/* List Items */
+.v-list-item {
+  border-radius: 8px !important;
+  margin: 4px 8px;
+  transition: all 0.2s ease;
+}
+
+.v-list-item:hover {
+  background: rgba(21, 101, 192, 0.08);
+  transform: translateX(4px);
+}
+
+.v-list-item.v-list-item--active {
+  background: linear-gradient(135deg, rgba(21, 101, 192, 0.15), rgba(33, 150, 243, 0.08)) !important;
+  border-left: 4px solid #1565c0;
+  color: #1565c0 !important;
+}
+
+/* Navigation Drawer */
+.v-navigation-drawer {
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+.v-navigation-drawer .v-divider {
+  opacity: 0.3;
+  margin: 16px 8px !important;
+}
+
+/* Filter Section */
+.filter-section {
+  background: linear-gradient(135deg, rgba(21, 101, 192, 0.05), rgba(33, 150, 243, 0.03));
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(21, 101, 192, 0.1);
+  margin-bottom: 24px;
+}
+
+.v-theme--dark .filter-section {
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.08), rgba(33, 150, 243, 0.04));
+  border: 1px solid rgba(33, 150, 243, 0.15);
+}
+
+/* Statistics/Info Badges */
+.info-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(21, 101, 192, 0.1), rgba(33, 150, 243, 0.08));
+  border-radius: 8px;
+  font-weight: 600;
+  color: #1565c0;
+}
+
+.v-theme--dark .info-badge {
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.15), rgba(33, 150, 243, 0.1));
+  color: #42a5f5;
+}
+
+/* Icons in buttons */
+.v-icon {
+  transition: transform 0.3s ease;
+}
+
+/* Action Buttons Area */
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.action-buttons .v-btn {
+  min-width: 100px;
+}
+
+/* View Details Button */
+.v-btn[color="primary"] {
+  background: linear-gradient(135deg, #1565c0, #1976d2) !important;
+  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3) !important;
+}
+
+/* NEW Badge */
+.v-chip[color="error"] {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 83, 80, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 83, 80, 0);
+  }
+}
+
+/* Smooth transitions */
+* {
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Avatar Improvements */
+.v-avatar {
+  border: 3px solid rgba(21, 101, 192, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Search Field */
+.v-text-field.search-field {
+  border-radius: 12px !important;
+}
+
+.v-text-field.search-field .v-field {
+  background: linear-gradient(135deg, rgba(21, 101, 192, 0.08), rgba(33, 150, 243, 0.04)) !important;
+  border: 2px solid rgba(21, 101, 192, 0.2) !important;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.v-theme--dark .empty-state {
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.empty-state .v-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+
+/* Dialog Info Rows */
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(21, 101, 192, 0.04);
+  border-left: 3px solid #1565c0;
+}
+
+.v-theme--dark .info-row {
+  background: rgba(33, 150, 243, 0.08);
+  border-left: 3px solid #42a5f5;
+}
+
+.info-label {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: #1565c0;
+  font-weight: 600;
+  gap: 8px;
+}
+
+.v-theme--dark .info-label {
+  color: #42a5f5;
+}
+
+.info-value {
+  flex: 1;
+  text-align: right;
+  color: rgba(0, 0, 0, 0.87);
+  padding-left: 12px;
+}
+
+.v-theme--dark .info-value {
+  color: rgba(255, 255, 255, 0.87);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #1565c0, #1976d2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #1976d2, #2196F3);
+}
+
+.v-theme--dark ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Container Padding */
+.v-container {
+  padding-top: 32px;
+}
+
+/* Data table border radius and spacing */
+.v-data-table__wrapper {
+  border-radius: 12px;
+}
+
+/* Smooth transitions for all interactive elements */
+.v-card,
+.v-btn,
+.v-chip,
+.v-list-item {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Focus states */
+.v-btn:focus::before,
+.v-list-item:focus::before {
+  opacity: 0.12;
+}
+
+/* Loading state */
+.v-progress-linear {
+  border-radius: 4px;
+}
+
+/* Header consistency */
+.v-card-title {
+  padding: 20px 24px !important;
+}
+
+/* Settings page styling */
+.v-list {
+  border-radius: 12px;
+}
+
+/* Mobile optimization */
+@media (max-width: 600px) {
+  .v-data-table {
+    font-size: 0.85rem;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .v-card-title {
+    font-size: 1.1rem !important;
+  }
+}
+
+/* Status Badge Large */
+.status-badge-large {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 32px;
+  border: 3px solid;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(21, 101, 192, 0.05), rgba(33, 150, 243, 0.03));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.status-badge-large:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.v-theme--dark .status-badge-large {
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.08), rgba(33, 150, 243, 0.04));
+}
+
+.status-label-small {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.54);
+  margin-bottom: 8px;
+}
+
+.v-theme--dark .status-label-small {
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.status-value-large {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+
 </style>
