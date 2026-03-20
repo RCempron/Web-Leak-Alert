@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useDisplay, useTheme } from 'vuetify'
 import RegisterForm from '@/components/auth/RegisterForm.vue'
 
@@ -8,6 +8,9 @@ const vuetifyTheme = useTheme()
 
 const theme = ref(localStorage.getItem('theme') ?? 'light')
 vuetifyTheme.global.name.value = theme.value
+
+const themeIcon = computed(() => (theme.value === 'light' ? 'mdi-weather-night' : 'mdi-white-balance-sunny'))
+const themeLabel = computed(() => (theme.value === 'light' ? 'Switch to dark mode' : 'Switch to light mode'))
 
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
@@ -53,7 +56,7 @@ onUnmounted(() => {
       flat
       density="comfortable"
       :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      class="admin-header"
+      class="admin-header glass-header"
     >
       <!-- FULL-WIDTH depth system -->
       <div class="header-depth-layer"></div>
@@ -69,6 +72,10 @@ onUnmounted(() => {
           >
             {{ phTime }}
           </div>
+
+          <v-btn icon small :title="themeLabel" @click="toggleTheme">
+            <v-icon size="18">{{ themeIcon }}</v-icon>
+          </v-btn>
         </div>
       </div>
     </v-app-bar>
@@ -159,6 +166,21 @@ onUnmounted(() => {
 
 <style scoped>
 /* THEME BACKGROUND */
+.auth-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.25), transparent 45%),
+    radial-gradient(circle at bottom right, rgba(21, 101, 192, 0.32), transparent 40%);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
 .auth-bg.light {
   background: linear-gradient(135deg, #e3f2fd, #f5f9ff);
 }
@@ -200,6 +222,46 @@ onUnmounted(() => {
   max-width: 1200px;
   overflow: hidden;
   margin: 0 auto; /* Ensure centering */
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.dark .mega-auth-card {
+  background: rgba(16, 22, 30, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+
+.mega-auth-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mega-left,
+.mega-right {
+  animation: fadeInUp 0.75s ease both;
+}
+
+.mega-right {
+  animation-delay: 0.12s;
+}
+
+.mega-left {
+  animation-delay: 0.05s;
 }
 
 /* GRID */
@@ -426,14 +488,29 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   width: 100%;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 /* text depth */
 .header-title {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
   letter-spacing: 0.4px;
+  flex: 1 1 240px;
+  min-width: 0;
+  white-space: normal;
 }
 .header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 600px) {
+  .header-title {
+    font-size: 0.95rem;
+    line-height: 1.1;
+  }
 }
 /* dark mode tuning */
 .v-theme--dark .admin-header {
