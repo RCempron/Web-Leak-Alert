@@ -507,23 +507,42 @@ async function savePin() {
         <div v-if="currentView === 'dashboard'">
           <v-card rounded="lg" elevation="2" class="position-relative">
             <div class="d-flex align-center justify-space-between py-6 px-6 border-bottom">
-              <div class="text-h5 font-weight-bold">
-                {{ showUpdatedOnly ? 'Updated Reports' : 'My Reports' }}
-              </div>
-              <v-spacer></v-spacer>
-              <div class="d-flex align-center gap-6">
-                <v-btn
-                  color="primary"
-                  prepend-icon="mdi-plus"
-                  variant="flat"
-                  size="large"
-                  @click="router.push('/report')"
-                  class="new-report-btn"
-                >
-                  New Report
-                </v-btn>
-              </div>
-            </div>
+  <div class="text-h5 font-weight-bold">
+    {{ showUpdatedOnly ? 'Updated Reports' : 'My Reports' }}
+  </div>
+  <v-spacer></v-spacer>
+  <div class="d-flex align-center" style="gap: 24px;">
+    <!-- Notification icon moved to header (never gets cut) -->
+    <v-btn
+      v-if="!showUpdatedOnly"
+      icon
+      class="notification-btn"
+      @click="showUpdatedReports"
+    >
+      <v-badge
+        v-if="notificationCount > 0"
+        :content="notificationCount"
+        color="error"
+        floating
+        overlap
+      >
+        <v-icon size="28">mdi-bell-ring</v-icon>
+      </v-badge>
+      <v-icon v-else size="28">mdi-bell-ring</v-icon>
+    </v-btn>
+
+    <v-btn
+      color="primary"
+      prepend-icon="mdi-plus"
+      variant="flat"
+      size="large"
+      @click="router.push('/report')"
+      class="new-report-btn"
+    >
+      New Report
+    </v-btn>
+  </div>
+</div>
             <v-alert
               v-if="showUpdatedOnly"
               density="compact"
@@ -549,39 +568,26 @@ async function savePin() {
             </v-alert>
             <v-card-text class="px-6 pb-6">
               <v-chip-group v-if="!showUpdatedOnly" v-model="currentStatus" mandatory class="mb-6">
-                <v-chip
-                  value="all"
-                  :color="theme === 'light' ? 'primary' : 'blue-darken-2'"
-                  variant="flat"
-                  size="large"
-                  >All <strong class="ml-1">{{ statusCounts.all }}</strong></v-chip
-                >
-                <v-chip value="pending" color="amber" variant="flat" size="large"
-                  >Pending <strong class="ml-1">{{ statusCounts.pending }}</strong></v-chip
-                >
-                <v-chip value="ongoing" color="blue" variant="flat" size="large"
-                  >Ongoing <strong class="ml-1">{{ statusCounts.ongoing }}</strong></v-chip
-                >
-                <v-chip value="resolved" color="green" variant="flat" size="large"
-                  >Resolved <strong class="ml-1">{{ statusCounts.resolved }}</strong></v-chip
-                >
-                <v-chip value="rejected" color="red" variant="flat" size="large"
-                  >Rejected <strong class="ml-1">{{ statusCounts.rejected }}</strong></v-chip
-                >
-                <v-spacer />
-                <v-btn v-if="!showUpdatedOnly" icon class="notification-btn" @click="showUpdatedReports">
-                  <v-badge
-                    v-if="notificationCount > 0"
-                    :content="notificationCount"
-                    color="error"
-                    floating
-                    overlap
-                  >
-                    <v-icon size="28">mdi-bell-ring</v-icon>
-                  </v-badge>
-                  <v-icon v-else size="28">mdi-bell-ring</v-icon>
-                </v-btn>
-              </v-chip-group>
+  <v-chip
+    value="all"
+    :color="theme === 'light' ? 'primary' : 'blue-darken-2'"
+    variant="flat"
+    size="large"
+    >All <strong class="ml-1">{{ statusCounts.all }}</strong></v-chip
+  >
+  <v-chip value="pending" color="amber" variant="flat" size="large"
+    >Pending <strong class="ml-1">{{ statusCounts.pending }}</strong></v-chip
+  >
+  <v-chip value="ongoing" color="blue" variant="flat" size="large"
+    >Ongoing <strong class="ml-1">{{ statusCounts.ongoing }}</strong></v-chip
+  >
+  <v-chip value="resolved" color="green" variant="flat" size="large"
+    >Resolved <strong class="ml-1">{{ statusCounts.resolved }}</strong></v-chip
+  >
+  <v-chip value="rejected" color="red" variant="flat" size="large"
+    >Rejected <strong class="ml-1">{{ statusCounts.rejected }}</strong></v-chip
+  >
+</v-chip-group>
               <div v-if="!showUpdatedOnly" class="mb-6">
                 <div class="text-subtitle-1 mb-2">Filter by Type</div>
                 <v-chip-group v-model="selectedType" class="d-flex flex-wrap">
@@ -1767,5 +1773,7 @@ async function savePin() {
   transform: translateY(-3px) !important;
   box-shadow: 0 8px 24px rgba(21, 101, 192, 0.4) !important;
 }
-
+.notification-actions {
+  gap: 24px !important;     /* or 32px if you want even more space */
+}
 </style>

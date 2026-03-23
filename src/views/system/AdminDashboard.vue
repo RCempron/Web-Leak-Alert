@@ -764,34 +764,34 @@ function handleMobileNav(view) {
             </div>
           </v-card>
         </div>
-        <!-- Map View -->
-        <div v-else-if="currentView === 'map'" style="height: calc(100vh - 200px)">
-          <v-card flat style="height: 100%; display: flex; flex-direction: column; border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);">
-            <v-card-title class="font-weight-bold d-flex align-center justify-space-between" style="background: linear-gradient(135deg, #1565c0, #1976d2); color: white;">
-              <div class="d-flex align-center gap-3">
-                <v-icon start>mdi-map-marker-multiple</v-icon>
-                <span>Consumer Reports Map</span>
-              </div>
-              <v-chip 
-                color="white" 
-                text-color="primary"
-                class="info-badge"
-                :label="`${reportsWithCoordinates.length} Pins`"
-              >
-                <v-icon start small>mdi-pin</v-icon>
-              </v-chip>
-            </v-card-title>
-            <v-divider />
-            <v-card-text style="flex: 1; padding: 0; overflow: hidden">
-              <div id="admin-report-map" style="width: 100%; height: 100%; border-radius: 0 0 16px 16px;"></div>
-            </v-card-text>
-            <v-card-actions class="pa-4">
-              <v-btn color="primary" variant="outlined" @click="currentView = 'dashboard'">
-                <v-icon start>mdi-arrow-left</v-icon> Back to Dashboard
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </div>
+       <!-- Map View - FULL VERTICAL STRETCH -->
+<div v-else-if="currentView === 'map'" class="map-view-wrapper">
+  <v-card flat class="map-card h-100 d-flex flex-column" style="border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);">
+    <v-card-title class="font-weight-bold d-flex align-center justify-space-between" style="background: linear-gradient(135deg, #1565c0, #1976d2); color: white;">
+      <div class="d-flex align-center gap-3">
+        <v-icon start>mdi-map-marker-multiple</v-icon>
+        <span>Consumer Reports Map</span>
+      </div>
+      <v-chip
+        color="white"
+        text-color="primary"
+        class="info-badge"
+        :label="`${reportsWithCoordinates.length} Pins`"
+      >
+        <v-icon start small>mdi-pin</v-icon>
+      </v-chip>
+    </v-card-title>
+    <v-divider />
+    <v-card-text class="flex-grow-1 pa-0 overflow-hidden">
+      <div id="admin-report-map" style="width: 100%; height: 100%; border-radius: 0 0 16px 16px;"></div>
+    </v-card-text>
+    <v-card-actions class="pa-4">
+      <v-btn color="primary" variant="outlined" @click="currentView = 'dashboard'">
+        <v-icon start>mdi-arrow-left</v-icon> Back to Dashboard
+      </v-btn>
+    </v-card-actions>
+  </v-card>
+</div>
       </v-container>
     </v-main>
     <!-- Pin Details Dialog -->
@@ -1716,6 +1716,24 @@ function handleMobileNav(view) {
   text-transform: uppercase;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
+/* ====================== */
+/* FULL-HEIGHT MAP STRETCH */
+/* ====================== */
+.map-view-wrapper {
+  height: calc(100vh - 140px);   /* App bar + container padding = perfect fit */
+  display: flex;
+}
 
+.map-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 
+/* Mobile: slightly less subtraction (more space) */
+@media (max-width: 600px) {
+  .map-view-wrapper {
+    height: calc(100vh - 120px);
+  }
+}
 </style>
