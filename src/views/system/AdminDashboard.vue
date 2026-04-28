@@ -196,12 +196,17 @@ async function updateStatus(reportId, newStatus, personnel = null) {
 }
 function handleStatusChange(item, newStatus) {
   const oldStatus = item.status
-  item.status = newStatus // Optimistic update for UI
-  if (oldStatus === 'pending' && newStatus === 'ongoing') {
+
+  // Optimistic update
+  item.status = newStatus
+
+  // If changing TO 'ongoing', show assign dialog (from ANY previous status)
+  if (newStatus === 'ongoing') {
     selectedReportForAssign.value = item
     assignedPersonnel.value = item.assigned_personnel || ''
     showAssignDialog.value = true
   } else {
+    // For other status changes, update directly
     updateStatus(item.id, newStatus)
   }
 }
