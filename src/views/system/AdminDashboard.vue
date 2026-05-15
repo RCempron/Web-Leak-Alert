@@ -60,7 +60,6 @@ const filteredReports = computed(() => {
   return list
 })
 
-// Summary counts
 const summaryCounts = computed(() => ({
   total:    reports.value.length,
   newCount: reports.value.filter(r => !r.viewed_by_admin).length,
@@ -88,6 +87,97 @@ const showAssignDialog = ref(false)
 const selectedReportForAssign = ref(null)
 const assignedPersonnel = ref('')
 const personnelOptions = ['Maintenance Team A', 'Maintenance Team B', 'Maintenance Team C']
+
+// ── Inline status update inside Complaint Details dialog ─
+const dialogStatusUpdate = ref('')
+watch(showReportDialog, (val) => {
+  if (val && selectedReport.value) dialogStatusUpdate.value = selectedReport.value.status || ''
+})
+
+async function confirmDialogStatusUpdate() {
+  await nextTick()
+  if (!dialogStatusUpdate.value || !selectedReport.value) return
+  if (dialogStatusUpdate.value === selectedReport.value.status) return
+  if (dialogStatusUpdate.value === 'ongoing') {
+    selectedReportForAssign.value = selectedReport.value
+    assignedPersonnel.value = selectedReport.value.assigned_personnel || ''
+    showAssignDialog.value = true
+    return
+  }
+  await updateStatus(selectedReport.value.id, dialogStatusUpdate.value)
+  selectedReport.value.status = dialogStatusUpdate.value
+  showSnackbar('Status updated successfully')
+}
+
+// ── Print/Save PDF ───────────────────────────────────────
+function printReport() {
+  if (!selectedReport.value) return
+  const r = selectedReport.value
+  const statusColors = { pending: '#92400e', ongoing: '#1e40af', resolved: '#166534', rejected: '#991b1b' }
+  const statusBg     = { pending: '#fef3c7', ongoing: '#dbeafe', resolved: '#dcfce7', rejected: '#fee2e2' }
+  const statusBorder = { pending: '#f59e0b', ongoing: '#3b82f6', resolved: '#22c55e', rejected: '#ef4444' }
+  const st = r.status || 'pending'
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Complaint Report – ${r.type}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    * { font-family: 'Plus Jakarta Sans', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f0f6ff; padding: 32px; color: #0f172a; }
+    .card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.10); max-width: 720px; margin: 0 auto; }
+    .header { background: linear-gradient(135deg, #1d4ed8, #2563eb); padding: 28px 32px; display: flex; align-items: center; gap: 18px; }
+    .header-logo { width: 52px; height: 52px; background: rgba(255,255,255,0.18); border-radius: 14px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.25); font-size: 22px; color: white; font-weight: 800; }
+    .header-info h1 { font-size: 20px; font-weight: 800; color: white; }
+    .header-info p  { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 4px; }
+    .status-badge { margin: 24px 32px 0; display: inline-block; padding: 10px 22px; border-radius: 10px; font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; background: ${statusBg[st]}; border: 2px solid ${statusBorder[st]}; color: ${statusColors[st]}; }
+    .body { padding: 22px 32px 28px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+    .item { background: #f0f6ff; border-radius: 10px; padding: 12px 14px; border: 1px solid #bfdbfe; }
+    .item-lbl { font-size: 10px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .item-val { font-size: 14px; font-weight: 600; color: #0f172a; }
+    .full { grid-column: 1 / -1; }
+    .notes { background: #f8fafc; border-radius: 10px; padding: 14px; border: 1px solid #e2e8f0; margin-bottom: 18px; }
+    .notes-lbl { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .notes-val { font-size: 14px; color: #0f172a; line-height: 1.6; }
+    .footer-strip { background: #1e3a8a; color: rgba(255,255,255,0.8); font-size: 11px; padding: 12px 32px; display: flex; justify-content: space-between; }
+    @media print { body { background: white; padding: 0; } .card { box-shadow: none; border-radius: 0; } }
+  </style></head><body>
+  <div class="card">
+    <div class="header">
+      <div class="header-logo">B</div>
+      <div class="header-info">
+        <h1>BCWD Complaint Report</h1>
+        <p>Butuan City Water District — Complaint Management System</p>
+      </div>
+    </div>
+    <div style="padding:0 32px;">
+      <div class="status-badge">Status: ${st.toUpperCase()}</div>
+    </div>
+    <div class="body">
+      <div class="grid">
+        <div class="item"><div class="item-lbl">Complaint Type</div><div class="item-val">${r.type || 'N/A'}</div></div>
+        <div class="item"><div class="item-lbl">Reported By</div><div class="item-val">${reporterName.value || 'N/A'}</div></div>
+        <div class="item"><div class="item-lbl">Severity</div><div class="item-val">${r.severity || 'N/A'}</div></div>
+        <div class="item"><div class="item-lbl">Landmark</div><div class="item-val">${r.landmark || 'N/A'}</div></div>
+        <div class="item"><div class="item-lbl">Assigned To</div><div class="item-val">${r.assigned_personnel || 'N/A'}</div></div>
+        <div class="item"><div class="item-lbl">Coordinates</div><div class="item-val">${r.latitude ? `${r.latitude.toFixed(5)}, ${r.longitude.toFixed(5)}` : 'N/A'}</div></div>
+        <div class="item full"><div class="item-lbl">Date Reported</div><div class="item-val">${new Date(r.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</div></div>
+      </div>
+      ${r.notes ? `<div class="notes"><div class="notes-lbl">Notes</div><div class="notes-val">${r.notes}</div></div>` : ''}
+    </div>
+    <div class="footer-strip">
+      <span>© 2025 BCWD Complaint System</span>
+      <span>Printed: ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</span>
+      <span>Gov. Jose A. Rosales Ave., Butuan City</span>
+    </div>
+  </div>
+  <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`
+
+  const win = window.open('', '_blank')
+  win.document.write(html)
+  win.document.close()
+}
 
 // ── Map ──────────────────────────────────────────────────
 const mapInstance = ref(null)
@@ -130,11 +220,15 @@ function handleStatusChange(item, newStatus) {
 async function confirmAssign() {
   if (!assignedPersonnel.value) { showSnackbar('Please select personnel'); return }
   await updateStatus(selectedReportForAssign.value.id, 'ongoing', assignedPersonnel.value)
+  if (selectedReport.value && selectedReport.value.id === selectedReportForAssign.value.id) {
+    selectedReport.value.status = 'ongoing'
+    dialogStatusUpdate.value = 'ongoing'
+  }
   showAssignDialog.value = false; selectedReportForAssign.value = null; assignedPersonnel.value = ''
 }
 
 function cancelAssign() {
-  selectedReportForAssign.value.status = 'pending'
+  if (selectedReportForAssign.value) selectedReportForAssign.value.status = 'pending'
   showAssignDialog.value = false; selectedReportForAssign.value = null; assignedPersonnel.value = ''
 }
 
@@ -174,7 +268,26 @@ async function loadMapPins() {
     const glow = L.circleMarker(latLng, { radius: 20, fillColor: statusColor, color: statusColor, weight: 0, opacity: 0.3, fillOpacity: 0.2 }).addTo(mapInstance.value)
     const marker = L.circleMarker(latLng, { radius: 16, fillColor: statusColor, color: '#fff', weight: 3, opacity: 1, fillOpacity: 0.95 })
       .addTo(mapInstance.value)
-      .bindPopup(`<div style="font-size:13px;min-width:160px;font-weight:500;"><strong style="color:#1d4ed8;">${consumerName}</strong><br/><span style="color:#666;">${report.type}</span><br/><small>${report.landmark||'N/A'}</small><br/><small>Status: <strong style="color:${statusColor};">${report.status}</strong></small></div>`)
+      .bindPopup(
+        `<div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;min-width:180px;padding:4px 2px;">
+          <div style="font-weight:800;font-size:14px;color:#1d4ed8;margin-bottom:6px;">${consumerName}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Type</span>
+            <span style="font-weight:600;color:#0f172a;">${report.type}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Landmark</span>
+            <span style="font-weight:600;color:#0f172a;">${report.landmark || 'N/A'}</span>
+          </div>
+          <div style="margin-top:8px;padding:6px 10px;border-radius:8px;background:${statusColor}22;border:1px solid ${statusColor};text-align:center;">
+            <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${statusColor};">● ${report.status.toUpperCase()}</span>
+          </div>
+        </div>`,
+        { closeButton: false, autoClose: false, closeOnClick: false }
+      )
+
+    marker.on('mouseover', function () { this.openPopup() })
+    marker.on('mouseout',  function () { this.closePopup() })
     marker.on('click', () => { selectedMapPin.value = { ...report, consumerName }; showPinDetails.value = true })
     mapMarkers.value.push(marker, glow)
   }
@@ -240,112 +353,113 @@ function statusRowClass(report) {
 </script>
 
 <template>
-  <v-app :class="['bcwd-admin', theme]">
+  <v-app :class="['bcwd-app', theme]">
 
     <!-- ─── App Bar ─── -->
-    <v-app-bar flat height="60" :class="['admin-appbar', theme]">
-      <div class="appbar-inner">
-        <button class="menu-toggle" @click="toggleSidebar">
-          <v-icon size="22">mdi-menu</v-icon>
+    <v-app-bar flat height="56" :class="['bcwd-header', theme]">
+      <div class="header-inner">
+        <button class="menu-btn" @click="toggleSidebar" aria-label="Toggle menu">
+          <v-icon size="22" color="#1e40af">mdi-menu</v-icon>
         </button>
-        <div class="appbar-brand">
-          <v-img src="/images/logo.png" width="32" height="32" class="brand-img" />
-          <div class="brand-text">
-            <span class="brand-name">BCWD</span>
-            <span class="brand-role">Admin Dashboard</span>
-          </div>
+        <div class="header-brand">
+          <v-img src="/images/logo.png" width="28" height="28" class="header-img" />
+          <span class="header-title">BCWD Complaint System</span>
+          <span class="header-role-badge">Admin</span>
         </div>
-        <div class="appbar-right">
-          <span class="appbar-time" :class="{ 'd-none': mobile }">{{ phTime }}</span>
+        <div class="header-right">
+          <span class="header-time d-none d-sm-block">{{ phTime }}</span>
         </div>
       </div>
     </v-app-bar>
 
-    <!-- ─── Navigation Drawer ─── -->
-    <v-navigation-drawer v-model="drawer" :temporary="mobile" :rail="!mobile && rail" :width="260" :class="['admin-drawer', theme]">
-      <div class="drawer-profile" :class="{ 'drawer-profile--rail': !mobile && rail }">
+    <!-- ─── Sidebar ─── -->
+    <v-navigation-drawer v-model="drawer" :temporary="mobile" :rail="!mobile && rail" :width="250" class="bcwd-sidebar">
+      <div class="sidebar-profile" :class="{ 'sidebar-profile--rail': !mobile && rail }">
         <div class="admin-av">
-          <v-icon size="28" color="white">mdi-shield-account</v-icon>
+          <v-icon size="26" color="white">mdi-shield-account</v-icon>
         </div>
-        <div class="admin-info" v-if="!(!mobile && rail)">
-          <p class="admin-name">Administrator</p>
-          <p class="admin-role-label">System Admin</p>
+        <div class="profile-meta" v-if="!(!mobile && rail)">
+          <p class="profile-name">Administrator</p>
+          <p class="profile-role">System Admin</p>
         </div>
       </div>
-      <div class="drawer-divider" />
-      <nav class="drawer-nav">
-        <button :class="['nav-item', { 'nav-item--active': currentView === 'dashboard' }]" @click="handleMobileNav('dashboard')">
-          <v-icon size="20">mdi-view-dashboard-outline</v-icon>
-          <span v-if="!(!mobile && rail)" class="nav-label">Dashboard</span>
-          <span v-if="summaryCounts.newCount > 0 && !(!mobile && rail)" class="nav-badge">{{ summaryCounts.newCount }}</span>
+      <div class="sidebar-sep" />
+      <nav class="sidebar-nav">
+        <button :class="['s-nav-item', { 's-nav-item--active': currentView === 'dashboard' }]" @click="handleMobileNav('dashboard')">
+          <v-icon size="19">mdi-view-dashboard-outline</v-icon>
+          <span v-if="!(!mobile && rail)" class="s-nav-label">Dashboard</span>
+          <span v-if="summaryCounts.newCount > 0 && !(!mobile && rail)" class="s-nav-badge">{{ summaryCounts.newCount }}</span>
         </button>
-        <button :class="['nav-item', { 'nav-item--active': currentView === 'map' }]" @click="handleMobileNav('map')">
-          <v-icon size="20">mdi-map-outline</v-icon>
-          <span v-if="!(!mobile && rail)" class="nav-label">Map View</span>
+        <button :class="['s-nav-item', { 's-nav-item--active': currentView === 'map' }]" @click="handleMobileNav('map')">
+          <v-icon size="19">mdi-map-outline</v-icon>
+          <span v-if="!(!mobile && rail)" class="s-nav-label">Map View</span>
         </button>
-        <button :class="['nav-item', { 'nav-item--active': currentView === 'settings' }]" @click="handleMobileNav('settings')">
-          <v-icon size="20">mdi-cog-outline</v-icon>
-          <span v-if="!(!mobile && rail)" class="nav-label">Settings</span>
+        <button :class="['s-nav-item', { 's-nav-item--active': currentView === 'settings' }]" @click="handleMobileNav('settings')">
+          <v-icon size="19">mdi-cog-outline</v-icon>
+          <span v-if="!(!mobile && rail)" class="s-nav-label">Settings</span>
         </button>
-        <button class="nav-item nav-item--logout" @click="logout">
-          <v-icon size="20">mdi-logout</v-icon>
-          <span v-if="!(!mobile && rail)" class="nav-label">Sign Out</span>
+        <button class="s-nav-item s-nav-item--logout" @click="logout">
+          <v-icon size="19">mdi-logout</v-icon>
+          <span v-if="!(!mobile && rail)" class="s-nav-label">Sign Out</span>
         </button>
       </nav>
-      <div class="rail-toggle" @click="toggleSidebar">
-        <v-icon size="18">{{ (!mobile && rail) ? 'mdi-chevron-right' : 'mdi-chevron-left' }}</v-icon>
+      <div class="rail-lump" @click="toggleSidebar">
+        <v-icon size="16" color="white">{{ (!mobile && rail) ? 'mdi-chevron-right' : 'mdi-chevron-left' }}</v-icon>
       </div>
     </v-navigation-drawer>
 
     <!-- ─── Main ─── -->
-    <v-main :class="['admin-main', theme]">
-      <div class="admin-container">
+    <v-main :class="['bcwd-main', theme]">
+      <div class="view-full">
 
-        <!-- ═══ Dashboard ═══ -->
+        <!-- ═══ DASHBOARD VIEW ═══ -->
         <div v-if="currentView === 'dashboard'">
+
+          <div class="page-hdr">
+            <div>
+              <h1 class="page-title">Complaint Reports</h1>
+              <p class="page-sub">Monitor and manage all consumer water service reports</p>
+            </div>
+          </div>
 
           <!-- Summary cards -->
           <div class="summary-grid">
             <div :class="['sum-card', theme]" v-for="card in [
-              { label: 'Total Reports', value: summaryCounts.total, icon: 'mdi-file-document-multiple', color: '#1d4ed8' },
-              { label: 'New / Unread', value: summaryCounts.newCount, icon: 'mdi-star-circle', color: '#ef4444' },
-              { label: 'Pending', value: summaryCounts.pending, icon: 'mdi-clock-alert-outline', color: '#f59e0b' },
-              { label: 'Ongoing', value: summaryCounts.ongoing, icon: 'mdi-progress-wrench', color: '#3b82f6' },
-              { label: 'Resolved', value: summaryCounts.resolved, icon: 'mdi-check-circle-outline', color: '#22c55e' },
+              { label: 'Total Reports',  value: summaryCounts.total,    icon: 'mdi-file-document-multiple',  color: '#1d4ed8', bg: '#eff6ff' },
+              { label: 'New / Unread',   value: summaryCounts.newCount, icon: 'mdi-star-circle',             color: '#ef4444', bg: '#fee2e2' },
+              { label: 'Pending',        value: summaryCounts.pending,  icon: 'mdi-clock-alert-outline',     color: '#f59e0b', bg: '#fef3c7' },
+              { label: 'Ongoing',        value: summaryCounts.ongoing,  icon: 'mdi-progress-wrench',         color: '#3b82f6', bg: '#dbeafe' },
+              { label: 'Resolved',       value: summaryCounts.resolved, icon: 'mdi-check-circle-outline',   color: '#22c55e', bg: '#dcfce7' },
             ]" :key="card.label">
-              <div class="sum-icon" :style="{ background: card.color + '18', color: card.color }">
-                <v-icon size="24">{{ card.icon }}</v-icon>
+              <div class="sum-icon" :style="{ background: card.bg, color: card.color }">
+                <v-icon size="22">{{ card.icon }}</v-icon>
               </div>
               <div class="sum-body">
-                <p class="sum-value">{{ card.value }}</p>
+                <p class="sum-value" :style="{ color: card.color }">{{ card.value }}</p>
                 <p class="sum-label">{{ card.label }}</p>
               </div>
             </div>
           </div>
 
-          <!-- Filter section -->
+          <!-- Filter + search card -->
           <div :class="['filter-card', theme]">
             <div class="filter-top">
-              <h2 class="section-title">Complaint Reports</h2>
-              <div class="filter-top-right">
-                <span class="total-badge">{{ filteredReports.length }} records</span>
-              </div>
+              <h2 class="section-title">All Reports</h2>
+              <span class="total-badge">{{ filteredReports.length }} records</span>
             </div>
-
-            <!-- Status filter tabs -->
             <div class="status-tabs">
               <button v-for="s in statuses" :key="s"
-                :class="['status-tab', { 'status-tab--active': selectedStatus === s }, `status-tab--${s.toLowerCase()}`]"
+                :class="['f-chip', `f-chip--${s.toLowerCase()}`, { 'f-chip--on': selectedStatus === s }]"
                 @click="selectedStatus = s">
                 {{ s }}
               </button>
             </div>
-
-            <!-- Search -->
             <div class="search-wrap">
-              <v-icon class="search-icon" size="20">mdi-magnify</v-icon>
+              <v-icon class="search-icon" size="18" color="#94a3b8">mdi-magnify</v-icon>
               <input v-model="search" class="search-input" placeholder="Search by type, landmark, notes…" />
-              <button v-if="search" class="search-clear" @click="search = ''"><v-icon size="16">mdi-close</v-icon></button>
+              <button v-if="search" class="search-clear" @click="search = ''">
+                <v-icon size="15" color="#94a3b8">mdi-close</v-icon>
+              </button>
             </div>
           </div>
 
@@ -367,7 +481,7 @@ function statusRowClass(report) {
               <tbody>
                 <tr v-if="filteredReports.length === 0">
                   <td colspan="5" class="table-empty">
-                    <v-icon size="48" color="#e2e8f0">mdi-inbox-outline</v-icon>
+                    <v-icon size="48" color="#cbd5e1">mdi-inbox-outline</v-icon>
                     <p>No reports found</p>
                   </td>
                 </tr>
@@ -383,18 +497,28 @@ function statusRowClass(report) {
                   <td class="cell-muted">{{ item.landmark || '—' }}</td>
                   <td class="cell-muted cell-date">{{ new Date(item.created_at).toLocaleDateString('en-PH') }}</td>
                   <td>
-                    <select :value="item.status" class="status-select" :class="`status-select--${item.status}`"
-                      @change="(e) => handleStatusChange(item, e.target.value)">
-                      <option value="pending">Pending</option>
-                      <option value="ongoing">Ongoing</option>
-                      <option value="resolved">Resolved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
+                    <div class="status-select-wrap">
+                      <select
+                        :value="item.status"
+                        class="status-select"
+                        :class="`status-select--${item.status}`"
+                        @change="(e) => handleStatusChange(item, e.target.value)"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="ongoing">Ongoing</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                      <v-icon class="status-select-caret" size="13">mdi-chevron-down</v-icon>
+                      <span class="status-select-hint">
+                        <v-icon size="10">mdi-pencil-outline</v-icon> Click to change
+                      </span>
+                    </div>
                   </td>
                   <td>
                     <div class="table-actions">
                       <button class="btn-view" @click="openReportDetails(item)">
-                        <v-icon size="15" class="mr-1">mdi-eye</v-icon> View
+                        <v-icon size="14" class="mr-1">mdi-eye</v-icon> View
                       </button>
                       <span v-if="!item.viewed_by_admin" class="new-badge">NEW</span>
                     </div>
@@ -403,22 +527,32 @@ function statusRowClass(report) {
               </tbody>
             </table>
           </div>
+
         </div>
 
-        <!-- ═══ Map View ═══ -->
+        <!-- ═══ MAP VIEW ═══ -->
         <div v-else-if="currentView === 'map'" class="map-view">
+          <div class="page-hdr">
+            <div>
+              <h1 class="page-title">Map View</h1>
+              <p class="page-sub">Geographic overview of all pinned consumer reports</p>
+            </div>
+            <button class="btn-outline" @click="currentView = 'dashboard'">
+              <v-icon size="16" class="mr-1">mdi-arrow-left</v-icon> Back to Dashboard
+            </button>
+          </div>
           <div :class="['map-card', theme]">
-            <div class="map-header">
-              <div class="map-header-left">
-                <v-icon size="20">mdi-map-marker-multiple</v-icon>
-                <span>Consumer Reports Map</span>
+            <div class="map-card-header">
+              <div class="map-card-header-left">
+                <div class="map-header-icon">
+                  <v-icon size="20" color="white">mdi-map-marker-multiple</v-icon>
+                </div>
+                <div>
+                  <p class="map-header-title">Consumer Reports Map</p>
+                  <p class="map-header-sub">Hover any pin to preview · Click to manage</p>
+                </div>
               </div>
-              <div class="map-header-right">
-                <span class="pin-count">{{ reportsWithCoordinates.length }} pins</span>
-                <button class="btn-outline-sm" @click="currentView = 'dashboard'">
-                  <v-icon size="15" class="mr-1">mdi-arrow-left</v-icon> Back
-                </button>
-              </div>
+              <span class="pin-count-badge">{{ reportsWithCoordinates.length }} pins</span>
             </div>
             <div class="map-legend">
               <span v-for="(color, status) in statusHexColors" :key="status" class="legend-item">
@@ -430,40 +564,135 @@ function statusRowClass(report) {
           </div>
         </div>
 
-        <!-- ═══ Settings View ═══ -->
-        <div v-else-if="currentView === 'settings'" class="view-centered">
-          <div :class="['content-card', theme]">
-            <div class="content-card-header">
-              <div class="settings-icon-wrap"><v-icon size="32" color="#1d4ed8">mdi-cog-outline</v-icon></div>
-              <h2 class="content-card-title">Settings</h2>
-              <p class="content-card-sub">Manage admin preferences</p>
+        <!-- ═══ SETTINGS VIEW ═══ -->
+        <div v-else-if="currentView === 'settings'">
+          <div class="page-hdr">
+            <div>
+              <h1 class="page-title">Settings</h1>
+              <p class="page-sub">Manage your admin preferences and display options</p>
             </div>
-            <div class="settings-group">
-              <p class="settings-group-label">Appearance</p>
-              <div class="settings-row">
-                <div class="settings-row-info"><v-icon size="18">mdi-theme-light-dark</v-icon><span>Theme</span></div>
-                <v-select v-model="theme" :items="[{value:'light',title:'Light'},{value:'dark',title:'Dark'}]" density="compact" hide-details variant="outlined" style="width:140px" />
+          </div>
+          <div class="settings-hero">
+            <div class="settings-hero-icon"><v-icon size="36" color="white">mdi-cog</v-icon></div>
+            <div>
+              <h2 class="settings-hero-title">Admin Settings</h2>
+              <p class="settings-hero-sub">Manage your application preferences</p>
+            </div>
+          </div>
+          <div class="settings-grid">
+            <!-- Appearance -->
+            <div :class="['s-card', theme]">
+              <div class="s-card-header">
+                <div class="s-card-icon" style="background:#eff6ff;"><v-icon size="20" color="#1d4ed8">mdi-palette-outline</v-icon></div>
+                <div>
+                  <h3 class="s-card-title">Appearance</h3>
+                  <p class="s-card-sub">Customize how the app looks</p>
+                </div>
+              </div>
+              <div class="s-options">
+                <div class="s-option">
+                  <div class="s-option-info">
+                    <v-icon size="18" color="#64748b">mdi-theme-light-dark</v-icon>
+                    <div>
+                      <p class="s-option-label">Color Theme</p>
+                      <p class="s-option-desc">Switch between light and dark mode</p>
+                    </div>
+                  </div>
+                  <div class="theme-toggle-group">
+                    <button :class="['theme-btn', { 'theme-btn--on': theme === 'light' }]" @click="theme = 'light'">
+                      <v-icon size="15">mdi-white-balance-sunny</v-icon> Light
+                    </button>
+                    <button :class="['theme-btn', { 'theme-btn--on': theme === 'dark' }]" @click="theme = 'dark'">
+                      <v-icon size="15">mdi-weather-night</v-icon> Dark
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="settings-group">
-              <p class="settings-group-label">Time Display</p>
-              <div class="settings-row">
-                <div class="settings-row-info"><v-icon size="18">mdi-clock-outline</v-icon><span>Time Format</span></div>
-                <v-select v-model="timeFormat" :items="[{value:'24',title:'24-hour'},{value:'12',title:'12-hour'}]" density="compact" hide-details variant="outlined" style="width:140px" />
+            <!-- Time Display -->
+            <div :class="['s-card', theme]">
+              <div class="s-card-header">
+                <div class="s-card-icon" style="background:#f0fdf4;"><v-icon size="20" color="#16a34a">mdi-clock-outline</v-icon></div>
+                <div>
+                  <h3 class="s-card-title">Time Display</h3>
+                  <p class="s-card-sub">Set your preferred time format</p>
+                </div>
+              </div>
+              <div class="s-options">
+                <div class="s-option">
+                  <div class="s-option-info">
+                    <v-icon size="18" color="#64748b">mdi-clock-time-twelve-outline</v-icon>
+                    <div>
+                      <p class="s-option-label">Time Format</p>
+                      <p class="s-option-desc">Choose 12-hour or 24-hour clock</p>
+                    </div>
+                  </div>
+                  <div class="theme-toggle-group">
+                    <button :class="['theme-btn', { 'theme-btn--on': timeFormat === '24' }]" @click="timeFormat = '24'">24h</button>
+                    <button :class="['theme-btn', { 'theme-btn--on': timeFormat === '12' }]" @click="timeFormat = '12'">12h</button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="settings-group">
-              <p class="settings-group-label">Reports Table</p>
-              <div class="settings-row">
-                <div class="settings-row-info"><v-icon size="18">mdi-view-list</v-icon><span>Rows per page</span></div>
-                <v-select v-model="itemsPerPage" :items="[5,10,20,50]" density="compact" hide-details variant="outlined" style="width:140px" />
+            <!-- Reports Display -->
+            <div :class="['s-card', theme]">
+              <div class="s-card-header">
+                <div class="s-card-icon" style="background:#fef3c7;"><v-icon size="20" color="#d97706">mdi-file-document-multiple-outline</v-icon></div>
+                <div>
+                  <h3 class="s-card-title">Reports Display</h3>
+                  <p class="s-card-sub">Control how many records appear per page</p>
+                </div>
+              </div>
+              <div class="s-options">
+                <div class="s-option">
+                  <div class="s-option-info">
+                    <v-icon size="18" color="#64748b">mdi-view-list</v-icon>
+                    <div>
+                      <p class="s-option-label">Rows per Page</p>
+                      <p class="s-option-desc">Reports shown in the table</p>
+                    </div>
+                  </div>
+                  <div class="items-select-group">
+                    <button v-for="n in [5,10,20,50]" :key="n"
+                      :class="['items-btn', { 'items-btn--on': itemsPerPage === n }]"
+                      @click="itemsPerPage = n">{{ n }}</button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="card-actions mt-4">
-              <button class="btn-outline" @click="currentView = 'dashboard'"><v-icon size="16" class="mr-1">mdi-arrow-left</v-icon> Back</button>
+            <!-- About -->
+            <div :class="['s-card', theme]">
+              <div class="s-card-header">
+                <div class="s-card-icon" style="background:#f5f3ff;"><v-icon size="20" color="#7c3aed">mdi-information-outline</v-icon></div>
+                <div>
+                  <h3 class="s-card-title">About</h3>
+                  <p class="s-card-sub">System and contact information</p>
+                </div>
+              </div>
+              <div class="about-info">
+                <div class="about-row"><span class="about-lbl">System</span><span class="about-val">BCWD Complaint System</span></div>
+                <div class="about-row"><span class="about-lbl">Version</span><span class="about-val">2025.1</span></div>
+                <div class="about-row"><span class="about-lbl">Hotline</span><span class="about-val">(085) 817-6635</span></div>
+                <div class="about-row"><span class="about-lbl">Email</span><span class="about-val">bcwdrecords@gmail.com</span></div>
+                <div class="about-row"><span class="about-lbl">Address</span><span class="about-val">Gov. Jose A. Rosales Ave., Butuan City</span></div>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- ─── Footer ─── -->
+        <footer class="bcwd-footer">
+          <div class="footer-row">
+            <span>© 2025 BCWD Complaint System</span>
+            <div class="footer-contacts d-none d-md-flex">
+              <span><v-icon size="13">mdi-map-marker</v-icon> Gov. Jose A. Rosales Ave., Butuan City</span>
+              <span><v-icon size="13">mdi-phone</v-icon> (085) 817-6635</span>
+              <span><v-icon size="13">mdi-cellphone</v-icon> 0918-930-4234 · 0917-188-8726</span>
+              <span><v-icon size="13">mdi-email</v-icon> bcwdrecords@gmail.com</span>
+            </div>
+            <span>Philippines (Asia/Manila)</span>
+          </div>
+        </footer>
 
       </div>
     </v-main>
@@ -471,78 +700,122 @@ function statusRowClass(report) {
     <!-- ─── Pin Details Dialog ─── -->
     <v-dialog v-model="showPinDetails" max-width="540">
       <div :class="['bcwd-dialog', theme]">
-        <div class="dialog-topbar">
-          <div class="dialog-topbar-left"><v-icon size="20">mdi-map-pin</v-icon><h3>Pin Details</h3></div>
-          <button class="dialog-close" @click="showPinDetails = false"><v-icon size="20">mdi-close</v-icon></button>
+        <div class="dialog-bar">
+          <div class="dialog-bar-left"><v-icon size="19" color="white">mdi-map-pin</v-icon><h3>Pin Details</h3></div>
+          <button class="dialog-x" @click="showPinDetails = false"><v-icon size="19" color="white">mdi-close</v-icon></button>
         </div>
         <div class="dialog-body" v-if="selectedMapPin">
-          <div :class="['dialog-status', `dialog-status--${selectedMapPin.status || 'pending'}`]">
-            <span class="dialog-status-label">STATUS</span>
-            <span class="dialog-status-value">{{ (selectedMapPin.status || 'pending').toUpperCase() }}</span>
+          <div :class="['status-hero', `status-hero--${selectedMapPin.status || 'pending'}`]">
+            <span class="status-hero-lbl">STATUS</span>
+            <span class="status-hero-val">{{ (selectedMapPin.status || 'pending').toUpperCase() }}</span>
           </div>
           <div class="detail-grid">
-            <div class="detail-item" v-for="it in [
-              { label: 'Consumer', value: selectedMapPin.consumerName, icon: 'mdi-account' },
-              { label: 'Type', value: selectedMapPin.type, icon: 'mdi-format-list-bulleted' },
-              { label: 'Severity', value: selectedMapPin.severity || 'N/A', icon: 'mdi-alert' },
-              { label: 'Landmark', value: selectedMapPin.landmark || 'N/A', icon: 'mdi-map-marker' },
-              { label: 'Assigned to', value: selectedMapPin.assigned_personnel || 'N/A', icon: 'mdi-account-hard-hat' },
+            <div class="d-item" v-for="it in [
+              { label: 'Consumer',    value: selectedMapPin.consumerName,                 icon: 'mdi-account' },
+              { label: 'Type',        value: selectedMapPin.type,                         icon: 'mdi-format-list-bulleted' },
+              { label: 'Severity',    value: selectedMapPin.severity || 'N/A',            icon: 'mdi-alert' },
+              { label: 'Landmark',    value: selectedMapPin.landmark || 'N/A',            icon: 'mdi-map-marker' },
+              { label: 'Assigned to', value: selectedMapPin.assigned_personnel || 'N/A',  icon: 'mdi-account-hard-hat' },
             ]" :key="it.label">
-              <div class="detail-label"><v-icon size="14">{{ it.icon }}</v-icon> {{ it.label }}</div>
-              <div class="detail-value">{{ it.value }}</div>
+              <div class="d-item-lbl"><v-icon size="13">{{ it.icon }}</v-icon> {{ it.label }}</div>
+              <div class="d-item-val">{{ it.value }}</div>
             </div>
           </div>
           <div class="update-status-row">
-            <p class="update-status-label"><v-icon size="15" class="mr-1">mdi-sync</v-icon> Update Status</p>
-            <v-select v-model="mapStatusUpdate" :items="['pending','ongoing','resolved','rejected']" label="Select new status" density="compact" hide-details variant="outlined" />
+            <p class="update-status-label"><v-icon size="14" class="mr-1">mdi-sync</v-icon> Update Status</p>
+            <v-select v-model="mapStatusUpdate" :items="['pending','ongoing','resolved','rejected']" label="Select new status" density="comfortable" hide-details variant="outlined" />
           </div>
         </div>
-        <div class="dialog-footer">
-          <button class="btn-outline" @click="viewReportFromMap"><v-icon size="15" class="mr-1">mdi-eye</v-icon> View in Table</button>
+        <div class="dialog-foot">
+          <button class="btn-outline" @click="viewReportFromMap"><v-icon size="14" class="mr-1">mdi-eye</v-icon> View in Table</button>
           <button class="btn-outline" @click="showPinDetails = false">Cancel</button>
-          <button class="btn-primary" @click="updateMapPinStatus" :disabled="!mapStatusUpdate"><v-icon size="15" class="mr-1">mdi-check</v-icon> Update</button>
+          <button class="btn-primary" @click="updateMapPinStatus" :disabled="!mapStatusUpdate">
+            <v-icon size="14" class="mr-1">mdi-check</v-icon> Update
+          </button>
         </div>
       </div>
     </v-dialog>
 
-    <!-- ─── Report Details Dialog ─── -->
-    <v-dialog v-model="showReportDialog" max-width="720">
+    <!-- ─── Report Details Dialog (wide two-column layout) ─── -->
+    <v-dialog v-model="showReportDialog" max-width="960">
       <div :class="['bcwd-dialog', theme]">
-        <div class="dialog-topbar">
-          <div class="dialog-topbar-left"><v-icon size="20">mdi-file-document-outline</v-icon><h3>Complaint Details</h3></div>
-          <button class="dialog-close" @click="showReportDialog = false"><v-icon size="20">mdi-close</v-icon></button>
+        <div class="dialog-bar">
+          <div class="dialog-bar-left"><v-icon size="19" color="white">mdi-file-document-outline</v-icon><h3>Complaint Details</h3></div>
+          <button class="dialog-x" @click="showReportDialog = false"><v-icon size="19" color="white">mdi-close</v-icon></button>
         </div>
-        <div class="dialog-body" v-if="selectedReport">
-          <div :class="['dialog-status', `dialog-status--${selectedReport.status || 'pending'}`]">
-            <span class="dialog-status-label">STATUS</span>
-            <span class="dialog-status-value">{{ (selectedReport.status || 'pending').toUpperCase() }}</span>
+
+        <div class="dialog-body-wide" v-if="selectedReport">
+
+          <!-- Status hero — full width across both columns -->
+          <div :class="['status-hero', 'status-hero--fullrow', `status-hero--${dialogStatusUpdate || selectedReport.status || 'pending'}`]">
+            <span class="status-hero-lbl">STATUS</span>
+            <span class="status-hero-val">{{ (dialogStatusUpdate || selectedReport.status || 'pending').toUpperCase() }}</span>
           </div>
-          <div class="detail-grid">
-            <div class="detail-item" v-for="it in [
-              { label: 'Type', value: selectedReport.type, icon: 'mdi-format-list-bulleted' },
-              { label: 'Reported by', value: reporterName, icon: 'mdi-account' },
-              { label: 'Severity', value: selectedReport.severity || 'N/A', icon: 'mdi-alert' },
-              { label: 'Landmark', value: selectedReport.landmark || 'N/A', icon: 'mdi-map-marker' },
-              { label: 'Assigned to', value: selectedReport.assigned_personnel || 'N/A', icon: 'mdi-account-hard-hat' },
-              { label: 'Coordinates', value: selectedReport.latitude ? `${selectedReport.latitude.toFixed(5)}, ${selectedReport.longitude.toFixed(5)}` : 'N/A', icon: 'mdi-crosshairs-gps' },
-            ]" :key="it.label">
-              <div class="detail-label"><v-icon size="14">{{ it.icon }}</v-icon> {{ it.label }}</div>
-              <div class="detail-value">{{ it.value }}</div>
+
+          <!-- LEFT column: report details + notes -->
+          <div class="dialog-col">
+            <p class="col-section-label"><v-icon size="13" class="mr-1">mdi-information-outline</v-icon> Report Information</p>
+            <div class="detail-grid">
+              <div class="d-item" v-for="it in [
+                { label: 'Type',        value: selectedReport.type,                                                                               icon: 'mdi-format-list-bulleted' },
+                { label: 'Reported by', value: reporterName,                                                                                     icon: 'mdi-account' },
+                { label: 'Severity',    value: selectedReport.severity || 'N/A',                                                                 icon: 'mdi-alert' },
+                { label: 'Landmark',    value: selectedReport.landmark || 'N/A',                                                                 icon: 'mdi-map-marker' },
+                { label: 'Assigned to', value: selectedReport.assigned_personnel || 'N/A',                                                       icon: 'mdi-account-hard-hat' },
+                { label: 'Coordinates', value: selectedReport.latitude ? `${selectedReport.latitude.toFixed(5)}, ${selectedReport.longitude.toFixed(5)}` : 'N/A', icon: 'mdi-crosshairs-gps' },
+              ]" :key="it.label">
+                <div class="d-item-lbl"><v-icon size="13">{{ it.icon }}</v-icon> {{ it.label }}</div>
+                <div class="d-item-val">{{ it.value }}</div>
+              </div>
             </div>
-            <div v-if="selectedReport.notes" class="detail-item detail-item--full">
-              <div class="detail-label"><v-icon size="14">mdi-note-text</v-icon> Notes</div>
-              <div class="detail-value">{{ selectedReport.notes }}</div>
+            <div v-if="selectedReport.notes" class="d-item d-item--full">
+              <div class="d-item-lbl"><v-icon size="13">mdi-note-text</v-icon> Notes</div>
+              <div class="d-item-val">{{ selectedReport.notes }}</div>
             </div>
           </div>
-          <div v-if="selectedReport.images && selectedReport.images.length" class="dialog-images">
-            <p class="images-label"><v-icon size="14">mdi-image-multiple</v-icon> Attached Images</p>
-            <div class="images-grid">
-              <img v-for="(img, i) in selectedReport.images" :key="i" :src="img" class="thumb-img" @click="openImageViewer(img)" />
+
+          <!-- RIGHT column: status update + images -->
+          <div class="dialog-col">
+            <div class="inline-status-update">
+              <p class="update-status-label">
+                <v-icon size="14" class="mr-1">mdi-sync</v-icon> Update Status — click a status to apply immediately
+              </p>
+              <div class="inline-status-options">
+                <button
+                  v-for="s in ['pending', 'ongoing', 'resolved', 'rejected']"
+                  :key="s"
+                  :class="['inline-status-btn', `inline-status-btn--${s}`, { 'inline-status-btn--on': (dialogStatusUpdate || selectedReport.status) === s, 'inline-status-btn--current': selectedReport.status === s }]"
+                  @click="dialogStatusUpdate = s; confirmDialogStatusUpdate()"
+                >
+                  <v-icon size="13" class="mr-1">{{
+                    s === 'pending'  ? 'mdi-clock-outline' :
+                    s === 'ongoing'  ? 'mdi-progress-wrench' :
+                    s === 'resolved' ? 'mdi-check-circle-outline' :
+                                       'mdi-close-circle-outline'
+                  }}</v-icon>
+                  {{ s.charAt(0).toUpperCase() + s.slice(1) }}
+                  <span v-if="selectedReport.status === s" class="current-tag">Current</span>
+                </button>
+              </div>
+            </div>
+
+            <div v-if="selectedReport.images && selectedReport.images.length" class="dialog-imgs">
+              <p class="imgs-lbl"><v-icon size="13">mdi-image-multiple</v-icon> Attached Images</p>
+              <div class="imgs-grid">
+                <img v-for="(img, i) in selectedReport.images" :key="i" :src="img" class="thumb" @click="openImageViewer(img)" />
+              </div>
             </div>
           </div>
+
         </div>
-        <div class="dialog-footer">
-          <button class="btn-primary" @click="showReportDialog = false"><v-icon size="15" class="mr-1">mdi-close</v-icon> Close</button>
+
+        <div class="dialog-foot dialog-foot--report">
+          <button class="btn-print" @click="printReport">
+            <v-icon size="14" class="mr-1">mdi-printer</v-icon> Print / Save PDF
+          </button>
+          <button class="btn-primary" @click="showReportDialog = false">
+            <v-icon size="14" class="mr-1">mdi-close</v-icon> Close
+          </button>
         </div>
       </div>
     </v-dialog>
@@ -550,17 +823,17 @@ function statusRowClass(report) {
     <!-- ─── Assign Dialog ─── -->
     <v-dialog v-model="showAssignDialog" max-width="480">
       <div :class="['bcwd-dialog', theme]">
-        <div class="dialog-topbar">
-          <div class="dialog-topbar-left"><v-icon size="20">mdi-account-hard-hat</v-icon><h3>Assign Personnel</h3></div>
-          <button class="dialog-close" @click="cancelAssign"><v-icon size="20">mdi-close</v-icon></button>
+        <div class="dialog-bar">
+          <div class="dialog-bar-left"><v-icon size="19" color="white">mdi-account-hard-hat</v-icon><h3>Assign Personnel</h3></div>
+          <button class="dialog-x" @click="cancelAssign"><v-icon size="19" color="white">mdi-close</v-icon></button>
         </div>
         <div class="dialog-body">
           <p class="assign-hint">Select a maintenance team to handle this complaint.</p>
           <v-select v-model="assignedPersonnel" :items="personnelOptions" label="Select Personnel" density="comfortable" hide-details variant="outlined" />
         </div>
-        <div class="dialog-footer">
+        <div class="dialog-foot">
           <button class="btn-outline" @click="cancelAssign">Cancel</button>
-          <button class="btn-primary" @click="confirmAssign"><v-icon size="15" class="mr-1">mdi-check</v-icon> Assign</button>
+          <button class="btn-primary" @click="confirmAssign"><v-icon size="14" class="mr-1">mdi-check</v-icon> Assign</button>
         </div>
       </div>
     </v-dialog>
@@ -568,42 +841,44 @@ function statusRowClass(report) {
     <!-- ─── Map Assign Dialog ─── -->
     <v-dialog v-model="showMapAssignDialog" max-width="480">
       <div :class="['bcwd-dialog', theme]">
-        <div class="dialog-topbar">
-          <div class="dialog-topbar-left"><v-icon size="20">mdi-account-hard-hat</v-icon><h3>Assign Personnel</h3></div>
-          <button class="dialog-close" @click="cancelMapAssign"><v-icon size="20">mdi-close</v-icon></button>
+        <div class="dialog-bar">
+          <div class="dialog-bar-left"><v-icon size="19" color="white">mdi-account-hard-hat</v-icon><h3>Assign Personnel</h3></div>
+          <button class="dialog-x" @click="cancelMapAssign"><v-icon size="19" color="white">mdi-close</v-icon></button>
         </div>
         <div class="dialog-body">
+          <p class="assign-hint">Select a maintenance team to handle this complaint.</p>
           <v-select v-model="mapAssignedPersonnel" :items="personnelOptions" label="Select Personnel" density="comfortable" hide-details variant="outlined" />
         </div>
-        <div class="dialog-footer">
+        <div class="dialog-foot">
           <button class="btn-outline" @click="cancelMapAssign">Cancel</button>
-          <button class="btn-primary" @click="confirmMapAssign"><v-icon size="15" class="mr-1">mdi-check</v-icon> Assign</button>
+          <button class="btn-primary" @click="confirmMapAssign"><v-icon size="14" class="mr-1">mdi-check</v-icon> Assign</button>
         </div>
       </div>
     </v-dialog>
 
     <!-- ─── Image Viewer ─── -->
     <v-dialog v-model="showImageViewer" fullscreen>
-      <div :class="['image-viewer', theme]">
-        <div class="image-viewer-bar">
-          <span class="font-weight-600">Image Viewer</span>
-          <div class="viewer-controls">
+      <div :class="['img-viewer', theme]">
+        <div class="img-viewer-bar">
+          <span>Image Viewer</span>
+          <div class="d-flex gap-2">
             <button class="viewer-btn" @click="zoomOut"><v-icon>mdi-magnify-minus</v-icon></button>
             <button class="viewer-btn" @click="resetZoom"><v-icon>mdi-magnify</v-icon></button>
             <button class="viewer-btn" @click="zoomIn"><v-icon>mdi-magnify-plus</v-icon></button>
-            <button class="viewer-btn viewer-btn--close" @click="showImageViewer = false"><v-icon>mdi-close</v-icon></button>
+            <button class="viewer-btn viewer-btn--red" @click="showImageViewer = false"><v-icon>mdi-close</v-icon></button>
           </div>
         </div>
-        <div class="image-viewer-body" @wheel.prevent="(e) => e.deltaY < 0 ? zoomIn() : zoomOut()">
+        <div class="img-viewer-body" @wheel.prevent="e => e.deltaY < 0 ? zoomIn() : zoomOut()">
           <img :src="activeImage" :style="{ transform: `scale(${zoomLevel})` }" class="viewer-img" />
         </div>
       </div>
     </v-dialog>
 
     <!-- ─── Snackbar ─── -->
-    <v-snackbar v-model="snackbar" timeout="2500" location="bottom right" :color="theme === 'dark' ? '#1e3a8a' : '#1d4ed8'">
+    <v-snackbar v-model="snackbar" timeout="2500" location="bottom right" color="#1d4ed8">
       <div class="d-flex align-center gap-2"><v-icon size="18">mdi-check-circle</v-icon> {{ snackbarMessage }}</div>
     </v-snackbar>
+
   </v-app>
 </template>
 
@@ -611,222 +886,332 @@ function statusRowClass(report) {
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 * { font-family: 'Plus Jakarta Sans', sans-serif; box-sizing: border-box; }
 
-/* ── Themes ── */
-.bcwd-admin.light { --bg: #f0f6ff; --surface: #ffffff; --surface2: #f8fafc; --border: #e2e8f0; --text: #0f172a; --text-muted: #64748b; --sidebar-bg: #1e3a8a; }
-.bcwd-admin.dark  { --bg: #060e1a; --surface: #0f1e35; --surface2: #0c1828; --border: rgba(255,255,255,0.08); --text: #f1f5f9; --text-muted: #94a3b8; --sidebar-bg: #070e1c; }
+/* ── Theme vars ── */
+.bcwd-app.light { --bg: #f0f6ff; --surface: #ffffff; --surface2: #f8fafc; --border: #e2e8f0; --text: #0f172a; --text2: #334155; --muted: #64748b; }
+.bcwd-app.dark  { --bg: #060e1a; --surface: #0f1e35; --surface2: #0c1828; --border: rgba(255,255,255,0.09); --text: #f1f5f9; --text2: #cbd5e1; --muted: #94a3b8; }
 
 /* ── App Bar ── */
-.admin-appbar { background: var(--surface) !important; border-bottom: 1px solid var(--border) !important; box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important; }
-.appbar-inner { display: flex; align-items: center; width: 100%; padding: 0 20px; gap: 16px; }
-.menu-toggle { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); transition: all 0.2s; }
-.menu-toggle:hover { background: var(--surface2); color: #1d4ed8; }
-.appbar-brand { display: flex; align-items: center; gap: 10px; }
-.brand-img { border-radius: 6px; }
-.brand-text { display: flex; flex-direction: column; }
-.brand-name { font-size: 14px; font-weight: 800; color: #1e40af; line-height: 1; }
-.bcwd-admin.dark .brand-name { color: #60a5fa; }
-.brand-role { font-size: 11px; color: var(--text-muted); line-height: 1.2; }
-.appbar-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-.appbar-time { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bcwd-header { background: #ffffff !important; border-bottom: 1px solid #e2e8f0 !important; box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important; }
+.bcwd-header.dark { background: #0c1624 !important; border-bottom-color: rgba(255,255,255,0.08) !important; }
+.header-inner { display: flex; align-items: center; width: 100%; padding: 0 20px; gap: 14px; }
+.menu-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #e2e8f0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+.menu-btn:hover { background: #f1f5f9; }
+.bcwd-header.dark .menu-btn { border-color: rgba(255,255,255,0.12); }
+.header-brand { display: flex; align-items: center; gap: 10px; }
+.header-img { border-radius: 6px; flex-shrink: 0; }
+.header-title { font-size: 15px; font-weight: 700; color: #1e40af; letter-spacing: -0.3px; }
+.bcwd-header.dark .header-title { color: #60a5fa; }
+.header-role-badge { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 20px; font-size: 11px; font-weight: 700; padding: 2px 10px; letter-spacing: 0.3px; }
+.bcwd-app.dark .header-role-badge { background: rgba(29,78,216,0.18); color: #60a5fa; border-color: rgba(59,130,246,0.3); }
+.header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.header-time { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; }
+.bcwd-header.dark .header-time { color: #94a3b8; }
 
-/* ── Drawer ── */
-.admin-drawer { background: var(--sidebar-bg) !important; border-right: none !important; box-shadow: 2px 0 16px rgba(0,0,0,0.15) !important; }
-.drawer-profile { display: flex; align-items: center; gap: 14px; padding: 24px 20px 16px; }
-.drawer-profile--rail { justify-content: center; padding: 20px 0; }
-.admin-av { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08)); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.admin-info { overflow: hidden; }
-.admin-name { font-size: 14px; font-weight: 600; color: #fff; margin: 0; }
-.admin-role-label { font-size: 11px; color: rgba(255,255,255,0.5); margin: 2px 0 0; text-transform: uppercase; letter-spacing: 0.5px; }
-.drawer-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 0 16px 12px; }
-.drawer-nav { display: flex; flex-direction: column; padding: 0 12px; gap: 4px; }
-.nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: none; background: transparent; color: rgba(255,255,255,0.75); cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 500; width: 100%; text-align: left; position: relative; }
-.nav-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
-.nav-item--active { background: rgba(255,255,255,0.12); color: #fff !important; box-shadow: inset 3px 0 0 rgba(255,255,255,0.5); }
-.nav-item--logout { margin-top: 24px; color: rgba(255,255,255,0.45); }
-.nav-item--logout:hover { color: #fca5a5; background: rgba(239,68,68,0.1); }
-.nav-label { flex: 1; }
-.nav-badge { background: #ef4444; color: white; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 10px; }
-.rail-toggle { position: absolute; bottom: 32px; right: -16px; width: 32px; height: 64px; border-radius: 0 12px 12px 0; background: var(--sidebar-bg); display: flex; align-items: center; justify-content: center; cursor: pointer; color: rgba(255,255,255,0.7); box-shadow: 4px 0 12px rgba(0,0,0,0.2); transition: all 0.2s; }
-.rail-toggle:hover { color: #fff; }
+/* ── Sidebar ── */
+.bcwd-sidebar { background: #1d4ed8 !important; border-right: none !important; box-shadow: 2px 0 16px rgba(29,78,216,0.25) !important; }
+.bcwd-app.dark .bcwd-sidebar { background: #0f2560 !important; }
+.sidebar-profile { display: flex; align-items: center; gap: 12px; padding: 20px 16px 14px; }
+.sidebar-profile--rail { justify-content: center; padding: 18px 0; }
+.admin-av { width: 52px; height: 52px; border-radius: 14px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.profile-meta { overflow: hidden; }
+.profile-name { font-size: 14px; font-weight: 700; color: #ffffff; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-role { font-size: 11px; color: rgba(255,255,255,0.65); margin: 2px 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; }
+.sidebar-sep { height: 1px; background: rgba(255,255,255,0.18); margin: 0 14px 10px; }
+.sidebar-nav { display: flex; flex-direction: column; padding: 0 10px; gap: 3px; }
+.s-nav-item { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 10px; border: none; background: transparent; color: rgba(255,255,255,0.75); cursor: pointer; font-size: 14px; font-weight: 500; width: 100%; text-align: left; transition: all 0.18s; font-family: 'Plus Jakarta Sans', sans-serif; position: relative; }
+.s-nav-item:hover { background: rgba(255,255,255,0.15); color: #ffffff; }
+.s-nav-item--active { background: rgba(255,255,255,0.2) !important; color: #ffffff !important; font-weight: 700 !important; box-shadow: inset 3px 0 0 #ffffff; }
+.s-nav-label { flex: 1; }
+.s-nav-badge { background: #ef4444; color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 10px; }
+.s-nav-item--logout { margin-top: 20px; color: rgba(255,200,200,0.85) !important; }
+.s-nav-item--logout:hover { background: rgba(239,68,68,0.25) !important; color: #fca5a5 !important; }
+.rail-lump { position: absolute; top: 50%; right: -16px; transform: translateY(-50%); width: 32px; height: 64px; border-radius: 0 14px 14px 0; background: #1d4ed8; border: 1px solid rgba(255,255,255,0.2); border-left: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 3px 0 10px rgba(29,78,216,0.3); transition: all 0.2s; z-index: 10; }
+.bcwd-app.dark .rail-lump { background: #0f2560; }
+.rail-lump:hover { background: #1e40af; }
 
-/* ── Main ── */
-.admin-main { background: var(--bg) !important; }
-.admin-container { padding: 28px; max-width: 1300px; margin: 0 auto; }
+/* ── Main layout ── */
+.bcwd-main { background: var(--bg) !important; }
+.view-full { padding: 28px 32px 0; display: flex; flex-direction: column; min-height: calc(100vh - 56px); }
+.page-hdr { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; gap: 16px; flex-wrap: wrap; }
+.page-title { font-size: 26px; font-weight: 800; color: var(--text); margin: 0 0 4px; letter-spacing: -0.5px; }
+.page-sub { font-size: 14px; color: var(--muted); margin: 0; }
 
 /* ── Summary cards ── */
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
 .sum-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; transition: all 0.2s; }
-.sum-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
-.sum-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sum-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(29,78,216,0.1); }
+.sum-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .sum-body { min-width: 0; }
-.sum-value { font-size: 28px; font-weight: 800; color: var(--text); margin: 0; line-height: 1; letter-spacing: -1px; }
-.sum-label { font-size: 12px; color: var(--text-muted); margin: 4px 0 0; font-weight: 500; }
+.sum-value { font-size: 26px; font-weight: 800; margin: 0; line-height: 1; letter-spacing: -1px; }
+.sum-label { font-size: 11px; color: var(--muted); margin: 4px 0 0; font-weight: 600; }
 
 /* ── Filter card ── */
-.filter-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; margin-bottom: 16px; }
-.filter-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.section-title { font-size: 18px; font-weight: 800; color: var(--text); margin: 0; letter-spacing: -0.3px; }
-.total-badge { background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
-.bcwd-admin.dark .total-badge { background: rgba(29,78,216,0.15); color: #60a5fa; }
-
-/* ── Status tabs ── */
-.status-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-.status-tab { padding: 7px 16px; border-radius: 20px; border: 1.5px solid var(--border); background: transparent; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
-.status-tab:hover { border-color: #1d4ed8; color: #1d4ed8; }
-.status-tab--active { border-color: #1d4ed8; background: #1d4ed8; color: white; }
-.status-tab--new.status-tab--active    { background: #ef4444; border-color: #ef4444; }
-.status-tab--pending.status-tab--active { background: #f59e0b; border-color: #f59e0b; }
-.status-tab--ongoing.status-tab--active { background: #3b82f6; border-color: #3b82f6; }
-.status-tab--resolved.status-tab--active { background: #22c55e; border-color: #22c55e; }
-.status-tab--rejected.status-tab--active { background: #ef4444; border-color: #ef4444; }
+.filter-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; margin-bottom: 14px; }
+.filter-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
+.section-title { font-size: 17px; font-weight: 800; color: var(--text); margin: 0; letter-spacing: -0.3px; }
+.total-badge { background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; white-space: nowrap; }
+.bcwd-app.dark .total-badge { background: rgba(29,78,216,0.15); color: #60a5fa; }
+.status-tabs { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
+.f-chip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 15px; border-radius: 50px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.f-chip:hover { border-color: #1d4ed8; color: #1d4ed8; }
+.f-chip--on.f-chip--all      { background: #1d4ed8; border-color: #1d4ed8; color: white; }
+.f-chip--on.f-chip--new      { background: #ef4444; border-color: #ef4444; color: white; }
+.f-chip--on.f-chip--pending  { background: #f59e0b; border-color: #f59e0b; color: white; }
+.f-chip--on.f-chip--ongoing  { background: #3b82f6; border-color: #3b82f6; color: white; }
+.f-chip--on.f-chip--resolved { background: #22c55e; border-color: #22c55e; color: white; }
+.f-chip--on.f-chip--rejected { background: #ef4444; border-color: #ef4444; color: white; }
 
 /* ── Search ── */
 .search-wrap { position: relative; display: flex; align-items: center; }
-.search-icon { position: absolute; left: 14px; color: var(--text-muted); }
+.search-icon { position: absolute; left: 14px; }
 .search-input { width: 100%; height: 42px; padding: 0 40px 0 44px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface2); color: var(--text); font-size: 14px; font-family: 'Plus Jakarta Sans', sans-serif; outline: none; transition: all 0.2s; }
-.search-input:focus { border-color: #1d4ed8; box-shadow: 0 0 0 3px rgba(29,78,216,0.12); }
-.search-input::placeholder { color: var(--text-muted); }
-.search-clear { position: absolute; right: 12px; width: 24px; height: 24px; border-radius: 50%; border: none; background: var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); }
+.search-input:focus { border-color: #1d4ed8; box-shadow: 0 0 0 3px rgba(29,78,216,0.1); }
+.search-input::placeholder { color: var(--muted); }
+.search-clear { position: absolute; right: 12px; width: 24px; height: 24px; border-radius: 50%; border: none; background: var(--surface2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
-/* ── Table ── */
-.reports-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+/* ── Reports table ── */
+.reports-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 0; }
 .reports-table { width: 100%; border-collapse: collapse; }
 .reports-table thead { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
-.reports-table thead th { color: white; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; padding: 14px 18px; text-align: left; }
+.reports-table thead th { color: white; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 14px 18px; text-align: left; }
 .reports-table tbody tr { border-bottom: 1px solid var(--border); transition: all 0.18s; }
 .reports-table tbody tr:last-child { border-bottom: none; }
 .table-row:hover { background: rgba(29,78,216,0.03); }
-.bcwd-admin.dark .table-row:hover { background: rgba(59,130,246,0.05); }
+.bcwd-app.dark .table-row:hover { background: rgba(59,130,246,0.05); }
 .table-row--new { background: #fffbeb; }
-.bcwd-admin.dark .table-row--new { background: rgba(245,158,11,0.06); }
+.bcwd-app.dark .table-row--new { background: rgba(245,158,11,0.06); }
 .table-row--highlighted { background: #eff6ff; box-shadow: inset 4px 0 0 #1d4ed8; }
-.bcwd-admin.dark .table-row--highlighted { background: rgba(29,78,216,0.1); }
+.bcwd-app.dark .table-row--highlighted { background: rgba(29,78,216,0.1); }
 .reports-table td { padding: 14px 18px; font-size: 14px; color: var(--text); vertical-align: middle; }
-.cell-muted { color: var(--text-muted); font-size: 13px; }
+.cell-muted { color: var(--muted); font-size: 13px; }
 .cell-date { white-space: nowrap; }
 .cell-type { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .type-dot { width: 8px; height: 8px; border-radius: 50%; background: #1d4ed8; flex-shrink: 0; }
 .table-loading { display: flex; justify-content: center; align-items: center; padding: 64px; }
-.table-empty { text-align: center; padding: 64px; color: var(--text-muted); }
+.table-empty { text-align: center; padding: 64px; color: var(--muted); }
 .table-empty p { margin: 12px 0 0; font-size: 15px; }
 
-/* ── Status select ── */
-.status-select { padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--border); font-size: 13px; font-weight: 600; background: var(--surface2); color: var(--text); cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; outline: none; transition: all 0.2s; appearance: none; -webkit-appearance: none; min-width: 110px; }
+/* ── Status select wrapper ── */
+.status-select-wrap { position: relative; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; cursor: pointer; }
+.status-select { padding: 6px 28px 6px 10px; border-radius: 8px; border: 1.5px solid var(--border); font-size: 12px; font-weight: 700; background: var(--surface2); color: var(--text); cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; outline: none; transition: all 0.2s; appearance: none; -webkit-appearance: none; min-width: 118px; }
+.status-select:hover { box-shadow: 0 0 0 3px rgba(29,78,216,0.12); }
 .status-select--pending  { border-color: #f59e0b; color: #92400e; background: #fef3c7; }
 .status-select--ongoing  { border-color: #3b82f6; color: #1e40af; background: #dbeafe; }
 .status-select--resolved { border-color: #22c55e; color: #166534; background: #dcfce7; }
 .status-select--rejected { border-color: #ef4444; color: #991b1b; background: #fee2e2; }
+.status-select-caret { position: absolute; right: 8px; top: 11px; pointer-events: none; opacity: 0.55; }
+.status-select-hint { display: flex; align-items: center; gap: 3px; font-size: 9px; font-weight: 600; color: var(--muted); letter-spacing: 0.2px; opacity: 0.8; padding-left: 2px; user-select: none; }
 
 /* ── Table actions ── */
 .table-actions { display: flex; align-items: center; gap: 10px; }
-.btn-view { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; border: none; border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; box-shadow: 0 2px 8px rgba(29,78,216,0.25); }
+.btn-view { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; border: none; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; box-shadow: 0 2px 8px rgba(29,78,216,0.25); }
 .btn-view:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(29,78,216,0.35); }
 .new-badge { background: #ef4444; color: white; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 10px; letter-spacing: 0.5px; animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); } 50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); } }
 
 /* ── Map view ── */
-.map-view { height: calc(100vh - 120px); }
-.map-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
-.map-header { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
-.map-header-left { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
-.map-header-right { display: flex; align-items: center; gap: 12px; }
-.pin-count { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.map-legend { display: flex; gap: 16px; padding: 10px 20px; background: var(--surface2); border-bottom: 1px solid var(--border); }
-.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text-muted); }
-.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
-.map-container { flex: 1; }
+.map-view { flex: 1; display: flex; flex-direction: column; }
+.map-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; flex: 1; display: flex; flex-direction: column; margin-bottom: 20px; }
+.map-card-header { background: linear-gradient(135deg, #1d4ed8, #2563eb); padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.map-card-header-left { display: flex; align-items: center; gap: 14px; }
+.map-header-icon { width: 42px; height: 42px; background: rgba(255,255,255,0.18); border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.25); flex-shrink: 0; }
+.map-header-title { font-size: 15px; font-weight: 700; color: white; margin: 0 0 2px; }
+.map-header-sub { font-size: 12px; color: rgba(255,255,255,0.7); margin: 0; }
+.pin-count-badge { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 20px; white-space: nowrap; }
+.map-legend { display: flex; gap: 16px; padding: 10px 20px; background: var(--surface2); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.map-container { flex: 1; min-height: 480px; }
 
-/* ── Centered views ── */
-.view-centered { display: flex; justify-content: center; padding: 40px 24px; }
-.content-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 40px; max-width: 560px; width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,0.06); }
-.content-card-header { text-align: center; margin-bottom: 28px; }
-.content-card-title { font-size: 22px; font-weight: 800; color: var(--text); margin: 8px 0 4px; letter-spacing: -0.4px; }
-.content-card-sub { font-size: 14px; color: var(--text-muted); margin: 0; }
-.settings-icon-wrap { width: 64px; height: 64px; background: #eff6ff; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
-.bcwd-admin.dark .settings-icon-wrap { background: rgba(29,78,216,0.15); }
-.card-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-.settings-group { margin-bottom: 20px; }
-.settings-group-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin: 0 0 10px; }
-.settings-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--surface2); border-radius: 10px; border: 1px solid var(--border); gap: 12px; }
-.settings-row-info { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; color: var(--text); }
+/* ── Settings ── */
+.settings-hero { display: flex; align-items: center; gap: 20px; background: linear-gradient(135deg, #1d4ed8, #2563eb); border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; }
+.settings-hero-icon { width: 64px; height: 64px; background: rgba(255,255,255,0.18); border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25); }
+.settings-hero-title { font-size: 22px; font-weight: 800; color: white; margin: 0 0 4px; letter-spacing: -0.4px; }
+.settings-hero-sub { font-size: 14px; color: rgba(255,255,255,0.75); margin: 0; }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+.s-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+.s-card-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+.s-card-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.s-card-title { font-size: 14px; font-weight: 700; color: var(--text); margin: 0 0 2px; }
+.s-card-sub { font-size: 12px; color: var(--muted); margin: 0; }
+.s-options { display: flex; flex-direction: column; gap: 12px; }
+.s-option { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.s-option-info { display: flex; align-items: center; gap: 12px; }
+.s-option-label { font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 2px; }
+.s-option-desc { font-size: 12px; color: var(--muted); margin: 0; }
+.theme-toggle-group { display: flex; border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; }
+.theme-btn { padding: 7px 14px; border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: 0.18s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.theme-btn--on { background: #1d4ed8; color: white; }
+.items-select-group { display: flex; border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; }
+.items-btn { padding: 7px 14px; border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.18s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.items-btn--on { background: #1d4ed8; color: white; }
+.about-info { display: flex; flex-direction: column; gap: 10px; }
+.about-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 14px; background: var(--surface2); border-radius: 10px; border: 1px solid var(--border); gap: 12px; }
+.about-lbl { font-size: 12px; font-weight: 600; color: var(--muted); min-width: 70px; }
+.about-val { font-size: 13px; font-weight: 600; color: var(--text); text-align: right; flex: 1; }
 
-/* ── Dialog ── */
-.bcwd-dialog { background: var(--surface); border-radius: 20px; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.2); }
-.bcwd-dialog.dark { background: #0f1e35; }
-.dialog-topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; }
-.dialog-topbar-left { display: flex; align-items: center; gap: 10px; }
-.dialog-topbar-left h3 { font-size: 15px; font-weight: 700; margin: 0; }
-.dialog-close { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; }
-.dialog-close:hover { background: rgba(255,255,255,0.2); }
-.dialog-body { padding: 22px; }
-.dialog-footer { padding: 14px 22px; background: var(--surface2); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
-.assign-hint { font-size: 13px; color: var(--text-muted); margin: 0 0 16px; }
+/* ── Footer ── */
+.bcwd-footer { background: #1e3a8a; color: white; padding: 10px 0; font-size: 12px; margin-top: auto; }
+.footer-row { padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.footer-contacts { display: flex; gap: 16px; opacity: 0.8; }
+.footer-contacts span { display: flex; align-items: center; gap: 5px; }
+
+/* ── Dialogs (shared) ── */
+:deep(.v-dialog > .v-overlay__content > *) { background: #ffffff !important; border-radius: 20px !important; }
+.bcwd-app.dark :deep(.v-dialog > .v-overlay__content > *) { background: #0f1e35 !important; }
+.bcwd-dialog { background: #ffffff !important; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.22); }
+.bcwd-app.dark .bcwd-dialog { background: #0f1e35 !important; }
+.dialog-bar { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+.dialog-bar-left { display: flex; align-items: center; gap: 10px; }
+.dialog-bar-left h3 { font-size: 15px; font-weight: 700; color: white; margin: 0; }
+.dialog-x { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.dialog-x:hover { background: rgba(255,255,255,0.2); }
+
+/* Original single-col dialog body (Pin Details, Assign dialogs) */
+.dialog-body { padding: 22px; background: #ffffff !important; }
+.bcwd-app.dark .dialog-body { background: #0f1e35 !important; }
+
+/* ── Wide two-column body for Report Details ── */
+.dialog-body-wide {
+  padding: 22px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  background: #ffffff !important;
+}
+.bcwd-app.dark .dialog-body-wide { background: #0f1e35 !important; }
+
+/* Status hero spans both columns */
+.status-hero--fullrow { grid-column: 1 / -1; }
+
+/* Each column stacks its children vertically */
+.dialog-col { display: flex; flex-direction: column; gap: 14px; }
+
+/* Column section label */
+.col-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  margin: 0 0 2px;
+}
+
+/* ── Dialog footer ── */
+.dialog-foot {
+  padding: 14px 22px;
+  background: #f8fafc !important;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dialog-foot--report { justify-content: space-between; }
+.bcwd-app.dark .dialog-foot { background: #0c1828 !important; border-top-color: rgba(255,255,255,0.09); }
+.assign-hint { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
 .update-status-row { margin-top: 16px; }
-.update-status-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin: 0 0 8px; display: flex; align-items: center; }
+.update-status-label { font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 8px; display: flex; align-items: center; text-transform: uppercase; letter-spacing: 0.5px; }
 
-/* ── Dialog status ── */
-.dialog-status { display: flex; flex-direction: column; align-items: center; padding: 20px; border-radius: 14px; margin-bottom: 18px; border: 2px solid; }
-.dialog-status--pending  { background: #fef3c7; border-color: #f59e0b; }
-.dialog-status--ongoing  { background: #dbeafe; border-color: #3b82f6; }
-.dialog-status--resolved { background: #dcfce7; border-color: #22c55e; }
-.dialog-status--rejected { background: #fee2e2; border-color: #ef4444; }
-.bcwd-admin.dark .dialog-status--pending  { background: rgba(245,158,11,0.08); }
-.bcwd-admin.dark .dialog-status--ongoing  { background: rgba(59,130,246,0.08); }
-.bcwd-admin.dark .dialog-status--resolved { background: rgba(34,197,94,0.08); }
-.bcwd-admin.dark .dialog-status--rejected { background: rgba(239,68,68,0.08); }
-.dialog-status-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; margin-bottom: 4px; }
-.dialog-status-value { font-size: 26px; font-weight: 800; letter-spacing: 1px; }
-.dialog-status--pending  .dialog-status-value { color: #92400e; }
-.dialog-status--ongoing  .dialog-status-value { color: #1e40af; }
-.dialog-status--resolved .dialog-status-value { color: #166534; }
-.dialog-status--rejected .dialog-status-value { color: #991b1b; }
+/* ── Status hero ── */
+.status-hero { display: flex; flex-direction: column; align-items: center; padding: 20px; border-radius: 14px; margin-bottom: 0; border: 2px solid; transition: all 0.25s; }
+.status-hero--pending  { background: #fef3c7; border-color: #f59e0b; }
+.status-hero--ongoing  { background: #dbeafe; border-color: #3b82f6; }
+.status-hero--resolved { background: #dcfce7; border-color: #22c55e; }
+.status-hero--rejected { background: #fee2e2; border-color: #ef4444; }
+.bcwd-app.dark .status-hero--pending  { background: rgba(245,158,11,0.1); }
+.bcwd-app.dark .status-hero--ongoing  { background: rgba(59,130,246,0.1); }
+.bcwd-app.dark .status-hero--resolved { background: rgba(34,197,94,0.1); }
+.bcwd-app.dark .status-hero--rejected { background: rgba(239,68,68,0.1); }
+.status-hero-lbl { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; opacity: 0.55; margin-bottom: 4px; color: #0f172a; }
+.status-hero-val { font-size: 26px; font-weight: 800; letter-spacing: 1px; transition: color 0.25s; }
+.status-hero--pending  .status-hero-val { color: #92400e; }
+.status-hero--ongoing  .status-hero-val { color: #1e40af; }
+.status-hero--resolved .status-hero-val { color: #166534; }
+.status-hero--rejected .status-hero-val { color: #991b1b; }
 
 /* ── Detail grid ── */
-.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-.detail-item { background: var(--surface2); border-radius: 10px; padding: 12px 14px; border: 1px solid var(--border); }
-.detail-item--full { grid-column: 1 / -1; }
-.detail-label { font-size: 10px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
-.bcwd-admin.dark .detail-label { color: #60a5fa; }
-.detail-value { font-size: 14px; font-weight: 500; color: var(--text); word-break: break-all; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.d-item { background: #f0f6ff !important; border-radius: 10px; padding: 11px 13px; border: 1px solid #bfdbfe; }
+.bcwd-app.dark .d-item { background: #0c1828 !important; border-color: rgba(255,255,255,0.09); }
+.d-item--full { grid-column: 1 / -1; }
+.d-item-lbl { font-size: 10px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+.bcwd-app.dark .d-item-lbl { color: #60a5fa; }
+.d-item-val { font-size: 14px; font-weight: 600; color: #0f172a; word-break: break-all; }
+.bcwd-app.dark .d-item-val { color: #f1f5f9; }
+
+/* ── Inline status update ── */
+.inline-status-update { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.inline-status-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+.inline-status-btn { position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 10px 8px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.18s; flex-direction: column; min-width: 0; overflow: hidden; }
+.inline-status-btn .v-icon { flex-shrink: 0; }
+.current-tag { font-size: 9px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; background: rgba(0,0,0,0.12); border-radius: 4px; padding: 1px 5px; line-height: 1.4; }
+.inline-status-btn--pending:hover  { background: #fef9ec; border-color: #f59e0b; color: #92400e; }
+.inline-status-btn--ongoing:hover  { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+.inline-status-btn--resolved:hover { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+.inline-status-btn--rejected:hover { background: #fff1f1; border-color: #ef4444; color: #991b1b; }
+.inline-status-btn--pending.inline-status-btn--on  { background: #fef3c7; border-color: #f59e0b; color: #92400e; box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+.inline-status-btn--ongoing.inline-status-btn--on  { background: #dbeafe; border-color: #3b82f6; color: #1e40af; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
+.inline-status-btn--resolved.inline-status-btn--on { background: #dcfce7; border-color: #22c55e; color: #166534; box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+.inline-status-btn--rejected.inline-status-btn--on { background: #fee2e2; border-color: #ef4444; color: #991b1b; box-shadow: 0 0 0 3px rgba(239,68,68,0.2); }
 
 /* ── Images ── */
-.dialog-images { margin-top: 8px; }
-.images-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin: 0 0 10px; display: flex; align-items: center; gap: 5px; }
-.images-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.thumb-img { width: 100%; height: 110px; object-fit: cover; border-radius: 10px; cursor: pointer; transition: all 0.2s; border: 1px solid var(--border); }
-.thumb-img:hover { transform: scale(1.04); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+.dialog-imgs { }
+.imgs-lbl { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 10px; display: flex; align-items: center; gap: 5px; }
+.imgs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.thumb { width: 100%; height: 110px; object-fit: cover; border-radius: 10px; cursor: pointer; transition: 0.2s; border: 1px solid var(--border); }
+.thumb:hover { transform: scale(1.04); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
 
 /* ── Image viewer ── */
-.image-viewer { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
-.image-viewer.light { background: #f8fafc; }
-.image-viewer.dark  { background: #060e1a; }
-.image-viewer-bar { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
-.viewer-controls { display: flex; gap: 8px; }
-.viewer-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; transition: all 0.2s; }
+.img-viewer { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+.img-viewer.light { background: #f8fafc; }
+.img-viewer.dark  { background: #060e1a; }
+.img-viewer-bar { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; padding: 14px 22px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; }
+.viewer-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; transition: 0.2s; }
 .viewer-btn:hover { background: rgba(255,255,255,0.2); }
-.viewer-btn--close { background: rgba(239,68,68,0.3); }
-.image-viewer-body { flex: 1; display: flex; align-items: center; justify-content: center; }
+.viewer-btn--red { background: rgba(239,68,68,0.3); border-color: rgba(239,68,68,0.4); }
+.img-viewer-body { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .viewer-img { max-width: 100%; max-height: 80vh; object-fit: contain; transition: transform 0.2s ease; }
 
 /* ── Buttons ── */
-.btn-primary { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; border: none; border-radius: 10px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; transition: all 0.2s; box-shadow: 0 4px 12px rgba(29,78,216,0.3); font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-primary { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; border: none; border-radius: 10px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; transition: all 0.2s; box-shadow: 0 4px 12px rgba(29,78,216,0.3); font-family: 'Plus Jakarta Sans', sans-serif; }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(29,78,216,0.4); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-.btn-outline { background: transparent; color: #1d4ed8; border: 1.5px solid #1d4ed8; border-radius: 10px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-outline { background: transparent; color: #1d4ed8; border: 1.5px solid #1d4ed8; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
 .btn-outline:hover { background: rgba(29,78,216,0.06); }
-.bcwd-admin.dark .btn-outline { color: #60a5fa; border-color: #60a5fa; }
-.btn-outline-sm { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s; }
-.btn-outline-sm:hover { background: rgba(255,255,255,0.25); }
+.bcwd-app.dark .btn-outline { color: #60a5fa; border-color: #60a5fa; }
+.btn-print { background: transparent; color: #16a34a; border: 1.5px solid #16a34a; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-print:hover { background: #f0fdf4; }
+.bcwd-app.dark .btn-print { color: #4ade80; border-color: #4ade80; }
+.bcwd-app.dark .btn-print:hover { background: rgba(74,222,128,0.08); }
+
+/* ── Vuetify overrides ── */
+:deep(.v-field) { border-radius: 10px !important; }
+:deep(.v-navigation-drawer__scrim) { display: none; }
 
 /* ── Responsive ── */
-@media (max-width: 768px) {
-  .admin-container { padding: 16px; }
+@media (max-width: 900px) {
+  .view-full { padding: 20px 16px 0; }
   .summary-grid { grid-template-columns: 1fr 1fr; }
+  .settings-grid { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
-  .reports-table { font-size: 12px; }
-  .reports-table td, .reports-table th { padding: 10px 12px; }
+  .footer-row { padding: 0 16px; }
+  .settings-hero { padding: 22px 20px; }
+  .inline-status-options { grid-template-columns: repeat(2, 1fr); }
+  /* Stack report dialog to single column on tablets */
+  .dialog-body-wide { grid-template-columns: 1fr; }
+  .status-hero--fullrow { grid-column: 1; }
 }
-
-/* ── V-field overrides ── */
-:deep(.v-field) { border-radius: 10px !important; }
+@media (max-width: 600px) {
+  .view-full { padding: 14px 12px 0; }
+  .summary-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .page-title { font-size: 20px; }
+  .reports-table td, .reports-table th { padding: 10px 12px; }
+  .inline-status-options { grid-template-columns: repeat(2, 1fr); }
+  .dialog-foot--report { flex-direction: column; }
+  .dialog-body-wide { grid-template-columns: 1fr; padding: 16px; gap: 14px; }
+}
 </style>
