@@ -1,3 +1,4 @@
+<!-- src/views/auth/RegisterView.vue — BCWD Redesign 2025 -->
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useDisplay, useTheme } from 'vuetify'
@@ -10,513 +11,207 @@ const theme = ref(localStorage.getItem('theme') ?? 'light')
 vuetifyTheme.global.name.value = theme.value
 
 const themeIcon = computed(() => (theme.value === 'light' ? 'mdi-weather-night' : 'mdi-white-balance-sunny'))
-const themeLabel = computed(() => (theme.value === 'light' ? 'Switch to dark mode' : 'Switch to light mode'))
-
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', theme.value)
   vuetifyTheme.global.name.value = theme.value
 }
-
 watch(theme, (val) => (vuetifyTheme.global.name.value = val))
 
-// -------- Philippine live date/time ----------
 const phTime = ref('')
 let timer = null
-
 function updatePhTime() {
   const now = new Date()
   phTime.value = new Intl.DateTimeFormat('en-PH', {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Manila',
+    weekday: 'short', year: 'numeric', month: 'short', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, timeZone: 'Asia/Manila',
   }).format(now)
 }
-
-onMounted(() => {
-  updatePhTime()
-  timer = setInterval(updatePhTime, 1000)
-})
-
-onUnmounted(() => {
-  if (timer) clearInterval(timer)
-})
+onMounted(() => { updatePhTime(); timer = setInterval(updatePhTime, 1000) })
+onUnmounted(() => { if (timer) clearInterval(timer) })
 </script>
 
 <template>
-  <v-app>
-    <!-- Glass Header -->
-    <v-app-bar
-      flat
-      density="comfortable"
-      :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      class="admin-header glass-header"
-    >
-      <!-- FULL-WIDTH depth system -->
-      <div class="header-depth-layer"></div>
-      <div class="header-inner px-2 px-sm-6">
-        <v-toolbar-title class="font-weight-bold header-title">
-          BCWD Complaint System
-        </v-toolbar-title>
-        <v-spacer />
-        <div class="d-flex align-center gap-3 header-right">
-          <div
-            class="text-caption text-white font-weight-medium ph-time"
-            :class="{ 'd-none d-sm-block': mobile }"
-          >
-            {{ phTime }}
-          </div>
-
-          <v-btn icon small :title="themeLabel" @click="toggleTheme">
-            <v-icon size="18">{{ themeIcon }}</v-icon>
-          </v-btn>
+  <v-app :theme="theme">
+    <v-app-bar flat height="56" :class="['top-rail', theme]">
+      <div class="rail-inner">
+        <div class="rail-brand">
+          <v-img src="/images/logo.png" width="28" height="28" class="rail-logo" />
+          <span class="rail-title">BCWD Complaint System</span>
         </div>
+        <v-spacer />
+        <span class="rail-time" :class="{ 'd-none': mobile }">{{ phTime }}</span>
+        <button class="rail-theme-btn" @click="toggleTheme">
+          <v-icon size="18">{{ themeIcon }}</v-icon>
+        </button>
       </div>
     </v-app-bar>
 
-    <!-- Main -->
-    <v-main class="auth-bg" :class="theme">
-      <div class="auth-wrapper">
-        <v-card class="mega-auth-card" elevation="16" rounded="xl">
-          <div class="mega-grid">
-            <!-- LEFT SIDE -->
-            <div class="mega-left">
-              <div class="mega-content">
-                <v-img src="/images/logo.png" width="110" class="mb-4" />
-                <h1>Create Account</h1>
-                <p class="subtitle">Join BCWD Complaint System</p>
-                <p class="desc">
-                  Register to report leaks, track complaints, and receive real-time updates on water
-                  services and system notifications.
-                </p>
+    <v-main :class="['auth-stage', theme]">
+      <div class="blob blob-a" />
+      <div class="blob blob-b" />
 
-                <div class="mega-stats">
-                  <div class="stat">
-                    <strong>Fast</strong>
-                    <span>Registration</span>
-                  </div>
-                  <div class="stat">
-                    <strong>Secure</strong>
-                    <span>Data Privacy</span>
-                  </div>
-                  <div class="stat">
-                    <strong>Reliable</strong>
-                    <span>System Access</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- RIGHT SIDE -->
-            <div class="mega-right">
-              <!-- Logo shown only on mobile -->
-              <v-img
-                v-if="mobile"
-                src="/images/logo.png"
-                class="mobile-logo"
-                max-width="140"
-                contain
-              />
-
-              <div class="login-header">
-                <h2>Create Account</h2>
-                <p>Fill in the details to get started</p>
-              </div>
-
-              <RegisterForm />
-
-              <div class="divider-wrap">
-                <span></span>
-                <small>or</small>
-                <span></span>
-              </div>
-
-              <div class="register-link">
-                <span>Already have an account?</span>
-                <RouterLink to="/login">Sign in</RouterLink>
+      <div class="stage-center">
+        <!-- Brand panel -->
+        <div v-if="!mobile" class="brand-panel">
+          <div class="brand-inner">
+            <h1 class="brand-heading">Join BCWD Portal</h1>
+            <p class="brand-sub">Create your account</p>
+            <div class="brand-divider" />
+            <p class="brand-body">
+              Register to report water leaks, low pressure, contamination, and other
+              service concerns. Your reports go directly to maintenance teams for fast
+              resolution.
+            </p>
+            <div class="feature-list">
+              <div class="feat-item" v-for="feat in features" :key="feat.icon">
+                <div class="feat-icon"><v-icon size="18" color="white">{{ feat.icon }}</v-icon></div>
+                <span class="feat-text">{{ feat.text }}</span>
               </div>
             </div>
           </div>
-        </v-card>
+        </div>
+
+        <!-- Form panel -->
+        <div class="form-panel">
+          <div :class="['form-card', theme]">
+            <div v-if="mobile" class="mobile-seal">
+              <v-img src="/images/logo.png" width="60" height="60" />
+            </div>
+            <div class="form-header">
+              <h2 class="form-heading">Create account</h2>
+              <p class="form-sub">Fill in your details to get started</p>
+            </div>
+
+            <RegisterForm />
+
+            <div class="or-divider">
+              <span class="or-line" /><small class="or-text">or</small><span class="or-line" />
+            </div>
+            <div class="register-row">
+              <span class="reg-prompt">Already have an account?</span>
+              <RouterLink to="/login" class="reg-link">Sign in</RouterLink>
+            </div>
+          </div>
+        </div>
       </div>
     </v-main>
 
-    <!-- Footer -->
-    <v-footer app class="auth-footer" :class="theme">
-      <div class="footer-inner">
-        <div class="left">© 2025 BCWD Complaint System</div>
-        <div class="center d-none d-md-flex">
-          <span
-            ><v-icon size="14">mdi-map-marker</v-icon> Gov. Jose A. Rosales Ave., Butuan City</span
-          >
-          <span><v-icon size="14">mdi-phone</v-icon> (085) 817-6635</span>
-          <span><v-icon size="14">mdi-email</v-icon> bcwdrecords@gmail.com</span>
+    <v-footer app :class="['auth-footer', theme]">
+      <div class="footer-row">
+        <span class="footer-copy">© 2025 BCWD Complaint System</span>
+        <div class="footer-contacts d-none d-md-flex">
+          <span><v-icon size="13">mdi-map-marker</v-icon> Gov. Jose A. Rosales Ave., Butuan City</span>
+          <span><v-icon size="13">mdi-phone</v-icon> (085) 817-6635</span>
+          <span><v-icon size="13">mdi-email</v-icon> bcwdrecords@gmail.com</span>
         </div>
-        <div class="right">Philippines (Asia/Manila)</div>
+        <span class="footer-tz">Philippines (Asia/Manila)</span>
       </div>
     </v-footer>
   </v-app>
 </template>
 
-<style scoped>
-/* THEME BACKGROUND */
-.auth-bg {
-  position: relative;
-  overflow: hidden;
-}
-
-.auth-bg::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.25), transparent 45%),
-    radial-gradient(circle at bottom right, rgba(21, 101, 192, 0.32), transparent 40%);
-  opacity: 0.75;
-  pointer-events: none;
-}
-
-.auth-bg.light {
-  background: linear-gradient(135deg, #e3f2fd, #f5f9ff);
-}
-.auth-bg.dark {
-  background: radial-gradient(circle at top, #0f1720, #05080d);
-}
-
-/* HEADER */
-.glass-header {
-  backdrop-filter: blur(12px);
-  background: #1565c0;
-  color: white;
-}
-.glass-header.dark {
-  background: #0f1720;
-}
-.title {
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-.ph-time {
-  font-size: 0.75rem;
-  opacity: 0.9;
-  margin-right: 12px;
-}
-
-/* WRAPPER */
-.auth-wrapper {
-  min-height: calc(100vh - 64px - 40px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-/* MEGA CARD - Improved default width */
-.mega-auth-card {
-  width: 90%; /* Better for both desktop and mobile */
-  max-width: 1200px;
-  overflow: hidden;
-  margin: 0 auto; /* Ensure centering */
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
-  transition: transform 0.35s ease, box-shadow 0.35s ease;
-}
-
-.dark .mega-auth-card {
-  background: rgba(16, 22, 30, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
-}
-
-.mega-auth-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.mega-left,
-.mega-right {
-  animation: fadeInUp 0.75s ease both;
-}
-
-.mega-right {
-  animation-delay: 0.12s;
-}
-
-.mega-left {
-  animation-delay: 0.05s;
-}
-
-/* GRID */
-.mega-grid {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-}
-
-@media (max-width: 960px) {
-  .mega-grid {
-    grid-template-columns: 1fr;
-  }
-
-  /* Hide left branding side on mobile */
-  .mega-left {
-    display: none !important;
-  }
-
-  /* Right side (form) takes full space */
-  .mega-right {
-    padding: 40px 24px;
-  }
-
-  /* Optional: tighter padding on very small screens */
-  @media (max-width: 600px) {
-    .mega-right {
-      padding: 32px 20px;
+<script>
+export default {
+  data() {
+    return {
+      features: [
+        { icon: 'mdi-send-check', text: 'Submit reports instantly' },
+        { icon: 'mdi-bell-ring-outline', text: 'Real-time status notifications' },
+        { icon: 'mdi-map-marker-check', text: 'GPS location pinning' },
+        { icon: 'mdi-shield-lock-outline', text: 'Secure & private data' },
+      ],
     }
-  }
+  },
 }
+</script>
 
-/* LEFT SIDE - SAME SYSTEM AS LOGIN */
-.mega-left {
-  position: relative;
-  padding: 48px;
-  display: flex;
-  align-items: center;
-  background: #e9f0f5;
-  color: #0f5088;
-  transition: 0.3s ease;
-}
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+* { font-family: 'Plus Jakarta Sans', sans-serif; }
 
-/* Dark mode */
-.dark .mega-left {
-  background: #0f1720;
-  color: #e3f2fd;
-}
+.top-rail { background: #ffffff !important; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.top-rail.dark { background: #0c1624 !important; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.rail-inner { display: flex; align-items: center; width: 100%; padding: 0 24px; gap: 16px; }
+.rail-brand { display: flex; align-items: center; gap: 10px; }
+.rail-logo { border-radius: 6px; }
+.rail-title { font-size: 15px; font-weight: 700; color: #1e40af; letter-spacing: -0.3px; }
+.top-rail.dark .rail-title { color: #60a5fa; }
+.rail-time { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; }
+.top-rail.dark .rail-time { color: #94a3b8; }
+.rail-theme-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #e2e8f0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #475569; transition: all 0.2s; }
+.top-rail.dark .rail-theme-btn { border-color: rgba(255,255,255,0.12); color: #94a3b8; }
+.rail-theme-btn:hover { background: #f1f5f9; color: #1e40af; }
 
-.mega-content {
-  max-width: 480px;
-}
+/* CHANGED: overflow: hidden → overflow-y: auto so page can scroll if needed */
+.auth-stage { min-height: 100vh; position: relative; overflow-y: auto; display: flex; align-items: center; justify-content: center; padding: 16px 20px; }
+.auth-stage.light { background: #f0f6ff; }
+.auth-stage.dark  { background: #060e1a; }
+.blob { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }
+.blob-a { width: 520px; height: 520px; top: -180px; left: -140px; background: radial-gradient(circle, rgba(59,130,246,0.13) 0%, transparent 70%); }
+.blob-b { width: 400px; height: 400px; bottom: -120px; right: -80px; background: radial-gradient(circle, rgba(14,165,233,0.11) 0%, transparent 70%); }
+.auth-stage.dark .blob-a { background: radial-gradient(circle, rgba(37,99,235,0.2) 0%, transparent 70%); }
 
-/* TEXT COLORS */
-.mega-content h1 {
-  color: #0d47a1;
-}
-.subtitle {
-  color: #1565c0;
-}
-.desc {
-  color: #455a64;
-}
+/* CHANGED: added max-height so card never exceeds viewport, overflow-y: auto for internal scroll */
+.stage-center { position: relative; z-index: 2; display: flex; align-items: stretch; width: 100%; max-width: 960px; max-height: calc(100vh - 80px); overflow-y: auto; border-radius: 20px; box-shadow: 0 24px 64px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06); }
+.auth-stage.light .stage-center { background: #ffffff; }
+.auth-stage.dark  .stage-center { background: #0f1e35; }
 
-/* Dark text */
-.dark .mega-content h1 {
-  color: #e3f2fd;
-}
-.dark .subtitle {
-  color: #90caf9;
-}
-.dark .desc {
-  color: #b0bec5;
-}
+/* CHANGED: padding 52px → 32px top/bottom */
+.brand-panel { flex: 1.1; background: linear-gradient(145deg, #1d4ed8 0%, #1e3a8a 40%, #0f2560 100%); padding: 24px 44px; display: flex; align-items: center; position: relative; overflow: hidden; }
+.brand-panel::before { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
+.brand-inner { position: relative; z-index: 1; }
+.brand-seal { width: 88px; height: 88px; background: rgba(255,255,255,0.12); border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; margin-bottom: 28px; backdrop-filter: blur(8px); }
+.brand-heading { font-size: 21px; font-weight: 800; color: #ffffff; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.5px; }
+.brand-sub { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.65); text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 14px; }
+.brand-divider { width: 40px; height: 2px; background: rgba(255,255,255,0.35); border-radius: 2px; margin-bottom: 12px; }
+.brand-body { font-size: 13px; color: rgba(255,255,255,0.78); line-height: 1.6; margin: 0 0 16px; max-width: 360px; }
+.feature-list { display: flex; flex-direction: column; gap: 8px; }
+.feat-item { display: flex; align-items: center; gap: 10px; }
+.feat-icon { width: 28px; height: 28px; background: rgba(255,255,255,0.15); border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.feat-text { font-size: 13px; color: rgba(255,255,255,0.85); font-weight: 500; }
 
-/* STATS */
-.mega-stats {
-  display: flex;
-  gap: 16px;
-  margin-top: 32px;
-}
-.stat {
-  background: transparent;
-  border: none;
-  color: inherit;
-}
-.stat strong {
-  display: block;
-  font-size: 1.1rem;
-}
-.stat span {
-  font-size: 0.7rem;
-  opacity: 0.9;
-}
+/* CHANGED: padding 40px → 24px top/bottom */
+.form-panel { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px 36px; }
+.form-card { width: 100%; max-width: 400px; }
+.form-card.light { background: #ffffff; }
+.form-card.dark  { background: #0f1e35; }
+.mobile-seal { display: flex; justify-content: center; margin-bottom: 24px; }
+/* CHANGED: margin-bottom 24px → 16px */
+.form-header { margin-bottom: 10px; }
+.form-heading { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 4px; letter-spacing: -0.5px; }
+.form-card.dark .form-heading { color: #f1f5f9; }
+.form-sub { font-size: 13px; color: #64748b; margin: 0; }
+.form-card.dark .form-sub { color: #94a3b8; }
 
-/* RIGHT SIDE */
-.mega-right {
-  padding: 48px 40px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
+/* CHANGED: margin 20px → 12px */
+.or-divider { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+.or-line { flex: 1; height: 1px; background: #e2e8f0; }
+.form-card.dark .or-line { background: rgba(255,255,255,0.1); }
+.or-text { font-size: 12px; color: #94a3b8; }
+.register-row { text-align: center; font-size: 14px; color: #64748b; }
+.form-card.dark .register-row { color: #94a3b8; }
+.reg-prompt { margin-right: 6px; }
+.reg-link { color: #1d4ed8; font-weight: 700; text-decoration: none; }
+.reg-link:hover { color: #1e40af; }
+.form-card.dark .reg-link { color: #60a5fa; }
 
-.login-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-.login-header h2 {
-  font-weight: 700;
-}
-.login-header p {
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
+.auth-footer { background: #1e3a8a !important; color: white; font-size: 12px; min-height: 40px; }
+.auth-footer.dark { background: #070e1c !important; }
+.footer-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 20px; }
+.footer-copy { opacity: 0.8; font-weight: 500; }
+.footer-contacts { display: flex; gap: 20px; opacity: 0.75; }
+.footer-contacts span { display: flex; align-items: center; gap: 5px; }
+.footer-tz { opacity: 0.7; }
 
-/* DIVIDER */
-.divider-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 22px 0;
-}
-.divider-wrap span {
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(to right, transparent, #bbb, transparent);
-}
-.divider-wrap small {
-  font-size: 0.7rem;
-  opacity: 0.6;
-}
+:deep(.v-text-field .v-field) { border-radius: 10px !important; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px !important; }
+:deep(.v-field__input) { min-height: 40px !important; padding-top: 8px !important; padding-bottom: 8px !important; font-size: 13px !important; }
+:deep(.v-label) { font-size: 13px !important; }
+:deep(.v-btn.v-btn--block) { border-radius: 10px !important; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700 !important; height: 40px !important; font-size: 14px !important; background: linear-gradient(135deg, #1d4ed8, #2563eb) !important; box-shadow: 0 4px 14px rgba(29,78,216,0.35) !important; transition: all 0.25s ease !important; }
+:deep(.v-btn.v-btn--block:hover) { transform: translateY(-1px) !important; box-shadow: 0 8px 20px rgba(29,78,216,0.4) !important; }
 
-/* REGISTER LINK */
-.register-link {
-  text-align: center;
-  font-size: 0.85rem;
-}
-.register-link a {
-  margin-left: 6px;
-  font-weight: 600;
-  text-decoration: none;
-  color: #1976d2;
-}
-
-/* FOOTER */
-.auth-footer {
-  background: #0f5088;
-  color: white;
-  font-size: 0.7rem;
-}
-.auth-footer.dark {
-  background: #0b1116;
-}
-
-.footer-inner {
-  width: 100%;
-  max-width: 1200px;
-  margin: auto;
-  padding: 6px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.footer-inner .center span {
-  margin: 0 10px;
-  white-space: nowrap;
-}
-/* Mobile-only logo */
-.mobile-logo {
-  display: block;
-  margin: 0 auto 32px auto;
-  width: 140px;
-  height: auto;
-}
-
-/* Smaller on very small screens */
-@media (max-width: 600px) {
-  .mobile-logo {
-    width: 120px;
-  }
-}
-
-/* Adjust header spacing after mobile logo */
-@media (max-width: 960px) {
-  .login-header {
-    margin-top: 8px;
-  }
-}
-
-/* ============================= */
-/* FULL-WIDTH HEADER DEPTH */
-/* ============================= */
-.admin-header {
-  position: relative;
-  padding: 0 !important; /* remove vuetify internal padding */
-  overflow: hidden;
-  z-index: 20;
-  /* elevation */
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.25),
-    0 6px 18px rgba(0, 0, 0, 0.18);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-/* true full-width depth layer */
-.header-depth-layer {
-  position: absolute;
-  inset: 0;
-  width: 100vw; /* force viewport width */
-  left: 50%;
-  transform: translateX(-50%); /* center it */
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.14),
-    rgba(255, 255, 255, 0.04),
-    rgba(0, 0, 0, 0.22)
-  );
-  z-index: 0;
-}
-/* content wrapper */
-.header-inner {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-/* text depth */
-.header-title {
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
-  letter-spacing: 0.4px;
-  flex: 1 1 240px;
-  min-width: 0;
-  white-space: normal;
-}
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-
-@media (max-width: 600px) {
-  .header-title {
-    font-size: 0.95rem;
-    line-height: 1.1;
-  }
-}
-/* dark mode tuning */
-.v-theme--dark .admin-header {
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.55),
-    0 10px 28px rgba(0, 0, 0, 0.65);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
+/* CHANGED: tightened form-panel padding, added max-height + overflow on stage-center for mobile */
+@media (max-width: 960px) { .stage-center { max-width: 460px; flex-direction: column; max-height: calc(100vh - 80px); overflow-y: auto; } .form-panel { padding: 16px 28px; } }
+@media (max-width: 600px) { .form-panel { padding: 20px; } }
 </style>

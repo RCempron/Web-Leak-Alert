@@ -6,59 +6,38 @@ import { supabase } from '@/utils/supabase'
 import AlertNotification from '@/components/common/AlertNotification.vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+
 const { mobile } = useDisplay()
 const router = useRouter()
-// Vuetify theme helper
 const vuetifyTheme = useTheme()
-// Persistent theme (read from localStorage)
 const theme = ref(localStorage.getItem('theme') ?? 'light')
-// Apply initial theme to Vuetify (use change to avoid deprecated assignment warnings)
 vuetifyTheme.change(theme.value)
-// toggle theme (and persist)
+
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', theme.value)
   vuetifyTheme.change(theme.value)
 }
-// Logout function
+
 async function logout() {
   await supabase.auth.signOut()
   router.push('/login')
 }
-// -------- Philippine live date/time ----------
+
 const phTime = ref('')
 let timer = null
 function updatePhTime() {
-  const now = new Date()
   phTime.value = new Intl.DateTimeFormat('en-PH', {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Manila',
-  }).format(now)
+    weekday: 'short', year: 'numeric', month: 'short', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, timeZone: 'Asia/Manila',
+  }).format(new Date())
 }
-onMounted(() => {
-  updatePhTime()
-  timer = setInterval(updatePhTime, 1000)
-})
-onUnmounted(() => {
-  if (timer) clearInterval(timer)
-})
-// Report form logic
+onMounted(() => { updatePhTime(); timer = setInterval(updatePhTime, 1000) })
+onUnmounted(() => { if (timer) clearInterval(timer) })
+
 const refVForm = ref(null)
-const reportTypes = [
-  'Broken Pipe',
-  'Low Pressure',
-  'Contamination',
-  'Water Leak',
-  'No Water',
-  'Other',
-]
+const reportTypes = ['Broken Pipe', 'Low Pressure', 'Contamination', 'Water Leak', 'No Water', 'Other']
 const severities = ['Low', 'Medium', 'High', 'Critical']
 const type = ref('')
 const severity = ref('')
@@ -68,14 +47,9 @@ const files = ref([])
 const previews = ref([])
 const latitude = ref(null)
 const longitude = ref(null)
-const formAction = ref({
-  formProcess: false,
-  formErrorMessage: '',
-  formSuccessMessage: '',
-})
-const canSubmit = computed(
-  () => !!type.value && !!severity.value && (landmark.value || notes.value),
-)
+const formAction = ref({ formProcess: false, formErrorMessage: '', formSuccessMessage: '' })
+const canSubmit = computed(() => !!type.value && !!severity.value && (landmark.value || notes.value))
+
 function onFilesChange(e) {
   const selected = Array.from(e.target.files || []).slice(0, 4)
   files.value = selected
@@ -90,7 +64,7 @@ function removePreview(i) {
   previews.value.splice(i, 1)
   files.value.splice(i, 1)
 }
-// ── Map Integration for Location Pinning ────────────────
+
 const mapInstance = ref(null)
 const markerInstance = ref(null)
 const showMapDialog = ref(false)
@@ -98,78 +72,37 @@ const showMapDialog = ref(false)
 watch(showMapDialog, async (newVal) => {
   if (newVal) {
     await nextTick()
-    // Ensure map container is ready and visible
     const mapContainer = document.getElementById('report-map')
     if (!mapContainer) return
-    
-    // Initialize map centered on Butuan City
-    mapInstance.value = L.map('report-map', { 
-      preferCanvas: true,
-      zoomControl: true,
-      dragging: true
-    }).setView([8.9731, 125.5244], 13)
-    
+    mapInstance.value = L.map('report-map', { preferCanvas: true, zoomControl: true, dragging: true }).setView([8.9731, 125.5244], 13)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(mapInstance.value)
-    
-    // Reset marker when opening dialog
     markerInstance.value = null
-    
-    // Wait for dialog to fully render, then trigger map resize
-    await new Promise(resolve => {
-      setTimeout(() => {
-        if (mapInstance.value) {
-          mapInstance.value.invalidateSize(true)
-        }
-        resolve()
-      }, 300)
-    })
-    
-    // If location already has coordinates, show marker
+    await new Promise(resolve => setTimeout(() => { if (mapInstance.value) mapInstance.value.invalidateSize(true); resolve() }, 300))
     if (latitude.value && longitude.value) {
       const latLng = [latitude.value, longitude.value]
       markerInstance.value = L.marker(latLng).addTo(mapInstance.value)
       mapInstance.value.setView(latLng, 15)
     }
-    
-    // Add click handler to map
     mapInstance.value.on('click', (e) => {
-      // Remove old marker if exists
-      if (markerInstance.value) {
-        markerInstance.value.remove()
-      }
-      // Add new marker at clicked location
+      if (markerInstance.value) markerInstance.value.remove()
       markerInstance.value = L.marker(e.latlng).addTo(mapInstance.value)
     })
   } else {
-    // Clean up map on dialog close
-    if (mapInstance.value) {
-      mapInstance.value.off('click')
-      mapInstance.value.remove()
-      mapInstance.value = null
-      markerInstance.value = null
-    }
+    if (mapInstance.value) { mapInstance.value.off('click'); mapInstance.value.remove(); mapInstance.value = null; markerInstance.value = null }
   }
 })
 
 function saveLocation() {
-  if (!markerInstance.value) {
-    formAction.value.formErrorMessage = 'Please select a location on the map first'
-    return
-  }
-  
+  if (!markerInstance.value) { formAction.value.formErrorMessage = 'Please select a location on the map first'; return }
   try {
     const { lat, lng } = markerInstance.value.getLatLng()
-    latitude.value = lat
-    longitude.value = lng
-    showMapDialog.value = false
-    formAction.value.formErrorMessage = ''
-  } catch (err) {
-    console.error('Save location error:', err)
-    formAction.value.formErrorMessage = 'Error saving location'
-  }
+    latitude.value = lat; longitude.value = lng
+    showMapDialog.value = false; formAction.value.formErrorMessage = ''
+  } catch (err) { formAction.value.formErrorMessage = 'Error saving location' }
 }
+
 async function submitReport() {
   const isValid = await refVForm.value?.validate()
   if (!isValid) return
@@ -186,20 +119,13 @@ async function submitReport() {
       const { data: urlData } = supabase.storage.from('report-attachments').getPublicUrl(data.path)
       uploadedUrls.push(urlData.publicUrl)
     }
-    const { error: insertError } = await supabase.from('reports').insert([
-      {
-        user_id: user.id,
-        type: type.value,
-        severity: severity.value,
-        landmark: landmark.value || null,
-        notes: notes.value || null,
-        latitude: latitude.value,
-        longitude: longitude.value,
-        images: uploadedUrls.length ? uploadedUrls : null,
-        pipe_location: pipeLocation.value || null,
-        status: 'pending',
-      },
-    ])
+    const { error: insertError } = await supabase.from('reports').insert([{
+      user_id: user.id, type: type.value, severity: severity.value,
+      landmark: landmark.value || null, notes: notes.value || null,
+      latitude: latitude.value, longitude: longitude.value,
+      images: uploadedUrls.length ? uploadedUrls : null,
+      pipe_location: pipeLocation.value || null, status: 'pending',
+    }])
     if (insertError) throw insertError
     formAction.value.formSuccessMessage = 'Report submitted successfully!'
     setTimeout(() => router.replace('/dashboard'), 1000)
@@ -209,7 +135,7 @@ async function submitReport() {
     formAction.value.formProcess = false
   }
 }
-// Pipe location
+
 const pipeLocation = ref(null)
 const pipeLocationOptions = [
   { value: 'mainline', title: 'Mainline – Large pipes along major roads' },
@@ -219,479 +145,403 @@ const pipeLocationOptions = [
   { value: 'unknown', title: 'Not sure – I am not certain' },
 ]
 </script>
+
 <template>
-  <v-app :theme="theme">
-    <!-- Header -->
-    <v-app-bar
-      flat
-      density="comfortable"
-      :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      class="admin-header"
-    >
-      <!-- FULL-WIDTH depth system -->
-      <div class="header-depth-layer"></div>
-      <div class="header-inner px-2 px-sm-6">
-        <v-toolbar-title class="font-weight-bold header-title">
-          BCWD Complaint System
-        </v-toolbar-title>
-        <v-spacer />
-        <div class="d-flex align-center gap-3 header-right">
-          <div
-            class="text-caption text-white font-weight-medium ph-time"
-            :class="{ 'd-none d-sm-block': mobile }"
-          >
-            {{ phTime }}
-          </div>
+  <v-app :class="['bcwd-app', theme]">
+
+    <!-- ─── App Bar (matches DashboardView) ─── -->
+    <v-app-bar flat height="56" :class="['bcwd-header', theme]">
+      <div class="header-inner">
+        <button class="menu-btn" @click="router.replace('/dashboard')" aria-label="Back to dashboard">
+          <v-icon size="22" color="#1e40af">mdi-arrow-left</v-icon>
+        </button>
+        <div class="header-brand">
+          <v-img src="/images/logo.png" width="28" height="28" class="header-img" />
+          <span class="header-title">BCWD Complaint System</span>
+        </div>
+        <div class="header-right">
+          <span class="header-time d-none d-sm-block">{{ phTime }}</span>
         </div>
       </div>
     </v-app-bar>
 
-    <!-- Main -->
-    <v-main
-      class="pa-2 pa-sm-4 pa-md-6"
-      :class="theme === 'light' ? 'bg-grey-lighten-5' : 'bg-grey-darken-4'"
-    >
-      <br /><br /><br />
-      <v-container class="px-3 px-sm-3">
-        <v-row justify="center" class="w-100 mx-0">
-          <v-col cols="12" sm="10" md="8" lg="7" xl="6" class="px-0">
-            <v-card
-              class="pa-4 pa-sm-8 text-left modern-card mx-auto"
-              elevation="10"
-              rounded="xl"
-              max-width="900"
-              :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
-            >
-              <h3 class="font-weight-bold mb-2 text-center" :class="mobile ? 'text-h6' : ''">
-                File a complaint
-              </h3>
-              <p class="text-medium-emphasis mb-4 text-center" :class="mobile ? 'text-body-2' : ''">
-                Provide details and optional photos. Capture your location for faster response.
-              </p>
-              <AlertNotification
-                :form-success-message="formAction.formSuccessMessage"
-                :form-error-message="formAction.formErrorMessage"
-              />
-              <v-form ref="refVForm">
-                <v-row>
-                  <v-col cols="12" md="6">
-                    <v-select
-                      v-model="type"
-                      :items="reportTypes"
-                      label="Type of complaint"
-                      :rules="[(v) => !!v || 'Type is required']"
-                      variant="outlined"
-                    />
-                  </v-col>
-                  <v-col cols="12" md="6">
-                    <v-select
-                      v-model="severity"
-                      :items="severities"
-                      label="Severity"
-                      :rules="[(v) => !!v || 'Severity is required']"
-                      variant="outlined"
-                    />
-                  </v-col>
-                </v-row>
-                <v-row>
-                  <v-col cols="12">
-                    <v-select
-                      v-model="pipeLocation"
-                      :items="pipeLocationOptions"
-                      item-title="title"
-                      item-value="value"
-                      label="Pipe Location (Optional)"
-                      variant="outlined"
-                      clearable
-                    />
-                  </v-col>
-                </v-row>
-                <v-text-field
-                  v-model="landmark"
-                  label="Landmark / Nearest place"
-                  variant="outlined"
-                  class="mb-3"
-                />
-                <v-textarea
-                  v-model="notes"
-                  label="Additional notes"
-                  rows="3"
-                  variant="outlined"
-                  class="mb-3"
-                />
-                <!-- Location -->
-                <div class="my-4">
-                  <div class="d-flex align-center gap-3 mb-2 flex-wrap">
-                    <v-btn small color="info" variant="outlined" @click="showMapDialog = true">
-                      <v-icon start>mdi-map-marker</v-icon> Pin Location on Map
-                    </v-btn>
-                    <span v-if="latitude && longitude" class="text-caption font-weight-medium">
-                      ✓ Location: Lat: {{ latitude.toFixed(6) }}, Lng: {{ longitude.toFixed(6) }}
-                    </span>
-                    <span v-else class="text-caption"> No location pinned</span>
+    <!-- ─── Main ─── -->
+    <v-main :class="['bcwd-main', theme]">
+      <div class="report-outer">
+
+        <!-- Page Header -->
+        <div class="report-hero">
+          <div class="report-hero-bg" />
+          <div class="report-hero-content">
+            <div class="report-hero-icon">
+              <v-icon size="32" color="white">mdi-clipboard-text-outline</v-icon>
+            </div>
+            <div>
+              <h1 class="report-hero-title">File a Complaint</h1>
+              <p class="report-hero-sub">Provide details and optional photos. Pin your location for faster response.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alert (full-width, above grid) -->
+        <div class="report-alert-wrap">
+          <AlertNotification
+            :form-success-message="formAction.formSuccessMessage"
+            :form-error-message="formAction.formErrorMessage"
+          />
+        </div>
+
+        <!-- ── 2-Column Card Grid (mirrors Settings / Profile) ── -->
+        <v-form ref="refVForm" class="report-grid-wrap">
+          <div class="report-grid">
+
+            <!-- ── LEFT COLUMN ── -->
+            <div class="report-col">
+
+              <!-- Card 1: Complaint Details -->
+              <div :class="['r-card', theme]">
+                <div class="r-card-header">
+                  <div class="r-card-icon" style="background:#eff6ff;">
+                    <v-icon size="20" color="#1d4ed8">mdi-water-alert-outline</v-icon>
                   </div>
-                  <small class="text-caption">
-                    Click the button to pin your location on the map. If not available, write the place in Landmark.
-                  </small>
+                  <div>
+                    <h3 class="r-card-title">Complaint Details</h3>
+                    <p class="r-card-sub">Select type, severity and pipe information</p>
+                  </div>
                 </div>
-                <!-- File Upload -->
-                <div class="my-3">
-                  <label class="mb-1">Attach photos (max 4) </label>
-                  <input type="file" accept="image/*" multiple @change="onFilesChange" />
-                  <v-row class="mt-3" dense>
-                    <v-col v-for="(p, i) in previews" :key="i" cols="6" sm="4" md="3">
-                      <v-card class="pa-2 rounded-lg elevation-2">
-                        <v-img :src="p" height="120" contain rounded />
-                        <v-row justify="space-between" class="mt-2">
-                          <small class="text-caption">{{ files[i]?.name }}</small>
-                          <v-btn icon small @click="removePreview(i)">
-                            <v-icon>mdi-close</v-icon>
-                          </v-btn>
-                        </v-row>
-                      </v-card>
-                    </v-col>
-                  </v-row>
+                <div class="r-card-body">
+                  <v-select
+                    v-model="type"
+                    :items="reportTypes"
+                    label="Type of Complaint"
+                    :rules="[(v) => !!v || 'Type is required']"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-water-alert"
+                    class="mb-3"
+                  />
+                  <v-select
+                    v-model="severity"
+                    :items="severities"
+                    label="Severity"
+                    :rules="[(v) => !!v || 'Severity is required']"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-alert-circle-outline"
+                    class="mb-3"
+                  />
+                  <v-select
+                    v-model="pipeLocation"
+                    :items="pipeLocationOptions"
+                    item-title="title"
+                    item-value="value"
+                    label="Pipe Location (Optional)"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-pipe"
+                    clearable
+                  />
                 </div>
-                <!-- Actions -->
-                <div
-                  class="d-flex flex-column flex-sm-row justify-space-between align-center mt-6 gap-3"
-                >
-                  <v-btn variant="outlined" size="large" @click="$router.replace('/dashboard')">
-                    <v-icon start>mdi-arrow-left</v-icon> Back
-                  </v-btn>
-                  <v-btn
-                    color="primary"
-                    size="large"
-                    :loading="formAction.formProcess"
+              </div>
+
+              <!-- Card 2: Location -->
+              <div :class="['r-card', theme]">
+                <div class="r-card-header">
+                  <div class="r-card-icon" style="background:#f0fdf4;">
+                    <v-icon size="20" color="#16a34a">mdi-map-marker-outline</v-icon>
+                  </div>
+                  <div>
+                    <h3 class="r-card-title">Location</h3>
+                    <p class="r-card-sub">Describe or pin where the issue is</p>
+                  </div>
+                </div>
+                <div class="r-card-body">
+                  <v-text-field
+                    v-model="landmark"
+                    label="Landmark / Nearest Place"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-map-marker-outline"
+                    class="mb-3"
+                  />
+                  <button type="button" class="btn-pin btn-pin--full" @click="showMapDialog = true">
+                    <v-icon size="16" class="mr-2">mdi-map-marker-plus</v-icon>
+                    Pin Location on Map
+                  </button>
+                  <div class="pin-status" :class="latitude && longitude ? 'pin-status--ok' : 'pin-status--empty'">
+                    <v-icon size="14">{{ latitude && longitude ? 'mdi-check-circle' : 'mdi-map-marker-off-outline' }}</v-icon>
+                    <span>{{ latitude && longitude ? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}` : 'No location pinned yet' }}</span>
+                  </div>
+                  <p class="location-hint">If map is unavailable, describe the location in the Landmark field above.</p>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- ── RIGHT COLUMN ── -->
+            <div class="report-col">
+
+              <!-- Card 3: Notes -->
+              <div :class="['r-card', theme]">
+                <div class="r-card-header">
+                  <div class="r-card-icon" style="background:#fef3c7;">
+                    <v-icon size="20" color="#d97706">mdi-note-text-outline</v-icon>
+                  </div>
+                  <div>
+                    <h3 class="r-card-title">Additional Notes</h3>
+                    <p class="r-card-sub">Describe the issue in your own words</p>
+                  </div>
+                </div>
+                <div class="r-card-body">
+                  <v-textarea
+                    v-model="notes"
+                    label="Describe the issue in detail"
+                    rows="5"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-text"
+                    no-resize
+                  />
+                </div>
+              </div>
+
+              <!-- Card 4: Photos -->
+              <div :class="['r-card', theme]">
+                <div class="r-card-header">
+                  <div class="r-card-icon" style="background:#f5f3ff;">
+                    <v-icon size="20" color="#7c3aed">mdi-image-multiple-outline</v-icon>
+                  </div>
+                  <div>
+                    <h3 class="r-card-title">Attach Photos</h3>
+                    <p class="r-card-sub">Upload up to 4 photos of the issue</p>
+                  </div>
+                  <span class="section-badge">Max 4</span>
+                </div>
+                <div class="r-card-body">
+                  <label class="file-upload-area" :class="{ 'file-upload-area--dark': theme === 'dark' }">
+                    <v-icon size="26" color="#94a3b8">mdi-cloud-upload-outline</v-icon>
+                    <span class="file-upload-text">Click to select photos</span>
+                    <span class="file-upload-hint">PNG, JPG up to 10MB each</span>
+                    <input type="file" accept="image/*" multiple @change="onFilesChange" class="file-input" />
+                  </label>
+                  <div v-if="previews.length" class="previews-grid">
+                    <div v-for="(p, i) in previews" :key="i" class="preview-item">
+                      <img :src="p" class="preview-img" />
+                      <button type="button" class="preview-remove" @click="removePreview(i)">
+                        <v-icon size="14" color="white">mdi-close</v-icon>
+                      </button>
+                      <div class="preview-name">{{ files[i]?.name }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 5: Actions -->
+              <div :class="['r-card r-card--actions', theme]">
+                <div class="form-actions">
+                  <button type="button" class="btn-outline" @click="router.replace('/dashboard')">
+                    <v-icon size="16" class="mr-1">mdi-arrow-left</v-icon> Back to Dashboard
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-primary"
+                    :class="{ 'btn-primary--disabled': formAction.formProcess || !canSubmit }"
                     :disabled="formAction.formProcess || !canSubmit"
                     @click="submitReport"
                   >
-                    <v-icon start>mdi-send</v-icon> Submit Report
-                  </v-btn>
+                    <v-icon v-if="!formAction.formProcess" size="16" class="mr-1">mdi-send</v-icon>
+                    <v-progress-circular v-else size="16" width="2" indeterminate color="white" class="mr-1" />
+                    {{ formAction.formProcess ? 'Submitting…' : 'Submit Report' }}
+                  </button>
                 </div>
-              </v-form>
-            </v-card>
-            <br /><br /><br /><br />
-          </v-col>
-        </v-row>
-      </v-container>
-      <!-- Footer Content Inside Main (for mobile) - Outside container -->
+                <p class="submit-hint">
+                  <v-icon size="13" color="#94a3b8">mdi-information-outline</v-icon>
+                  Type and Severity are required before submitting.
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </v-form>
+
+        <!-- Footer -->
+        <footer class="bcwd-footer">
+          <div class="footer-row">
+            <span>© 2025 BCWD Complaint System</span>
+            <div class="footer-contacts d-none d-md-flex">
+              <span><v-icon size="13">mdi-map-marker</v-icon> Gov. Jose A. Rosales Ave., Butuan City</span>
+              <span><v-icon size="13">mdi-phone</v-icon> (085) 817-6635</span>
+              <span><v-icon size="13">mdi-cellphone</v-icon> 0918-930-4234 · 0917-188-8726</span>
+              <span><v-icon size="13">mdi-email</v-icon> bcwdrecords@gmail.com</span>
+            </div>
+            <span>Philippines (Asia/Manila)</span>
+          </div>
+        </footer>
+      </div>
     </v-main>
-    <!-- Map Adjustment Dialog -->
-    <v-dialog v-model="showMapDialog" max-width="900">
-      <v-card rounded="xl" class="pa-4">
-        <v-card-title class="font-weight-bold">Pin Location on Map</v-card-title>
-        <v-divider />
-        <v-card-text>
-          <p class="text-caption text-medium-emphasis mb-3">Click on the map to place or move the pin. Then save.</p>
-          <div id="report-map" style="height: 400px; width: 100%; border: 1px solid #ddd; border-radius: 8px; z-index: 0; position: relative;"></div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showMapDialog = false">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" @click="saveLocation" :disabled="!markerInstance">
-            <v-icon start>mdi-check</v-icon> Save Location
-          </v-btn>
-        </v-card-actions>
-      </v-card>
+
+    <!-- ─── Map Dialog (matches DashboardView dialog style) ─── -->
+    <v-dialog v-model="showMapDialog" max-width="800">
+      <div :class="['bcwd-dialog', theme]">
+        <div class="dialog-bar">
+          <div class="dialog-bar-left">
+            <v-icon size="19" color="white">mdi-map-marker</v-icon>
+            <h3>Pin Location on Map</h3>
+          </div>
+          <button class="dialog-x" @click="showMapDialog = false">
+            <v-icon size="19" color="white">mdi-close</v-icon>
+          </button>
+        </div>
+        <div class="dialog-body">
+          <p style="font-size:13px;color:#64748b;margin:0 0 12px;">Click on the map to place or move the pin, then save.</p>
+          <div id="report-map" style="height:400px;width:100%;border-radius:12px;border:1px solid #e2e8f0;position:relative;z-index:0;" />
+        </div>
+        <div class="dialog-foot">
+          <button class="btn-outline" @click="showMapDialog = false">Cancel</button>
+          <button class="btn-primary" :class="{ 'btn-primary--disabled': !markerInstance }" :disabled="!markerInstance" @click="saveLocation">
+            <v-icon size="15" class="mr-1">mdi-check</v-icon> Save Location
+          </button>
+        </div>
+      </div>
     </v-dialog>
-    <!-- Footer (Desktop only) -->
+
   </v-app>
 </template>
+
 <style scoped>
-.text-blue {
-  color: #1976d2;
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+* { font-family: 'Plus Jakarta Sans', sans-serif; box-sizing: border-box; }
+
+/* ── Theme vars ── */
+.bcwd-app.light { --bg: #f0f6ff; --surface: #ffffff; --surface2: #f8fafc; --border: #e2e8f0; --text: #0f172a; --text2: #334155; --muted: #64748b; }
+.bcwd-app.dark  { --bg: #060e1a; --surface: #0f1e35; --surface2: #0c1828; --border: rgba(255,255,255,0.09); --text: #f1f5f9; --text2: #cbd5e1; --muted: #94a3b8; }
+
+/* ── Header ── */
+.bcwd-header { background: #ffffff !important; border-bottom: 1px solid #e2e8f0 !important; box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important; }
+.bcwd-header.dark { background: #0c1624 !important; border-bottom-color: rgba(255,255,255,0.08) !important; }
+.header-inner { display: flex; align-items: center; width: 100%; padding: 0 20px; gap: 14px; }
+.menu-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #e2e8f0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+.menu-btn:hover { background: #f1f5f9; }
+.bcwd-header.dark .menu-btn { border-color: rgba(255,255,255,0.12); }
+.header-brand { display: flex; align-items: center; gap: 10px; }
+.header-img { border-radius: 6px; flex-shrink: 0; }
+.header-title { font-size: 15px; font-weight: 700; color: #1e40af; letter-spacing: -0.3px; }
+.bcwd-header.dark .header-title { color: #60a5fa; }
+.header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.header-time { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; }
+.bcwd-header.dark .header-time { color: #94a3b8; }
+
+/* ── Main ── */
+.bcwd-main { background: var(--bg) !important; }
+.report-outer { display: flex; flex-direction: column; min-height: calc(100vh - 56px); }
+
+/* ── Hero Banner ── */
+.report-hero { position: relative; overflow: hidden; margin: 28px 32px 0; border-radius: 18px; }
+.report-hero-bg { position: absolute; inset: 0; background: linear-gradient(135deg, #1d4ed8, #2563eb, #7c3aed); }
+.report-hero-bg::after { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px); background-size: 24px 24px; }
+.report-hero-content { position: relative; z-index: 1; display: flex; align-items: center; gap: 20px; padding: 28px 32px; }
+.report-hero-icon { width: 60px; height: 60px; background: rgba(255,255,255,0.18); border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25); }
+.report-hero-title { font-size: 22px; font-weight: 800; color: white; margin: 0 0 4px; letter-spacing: -0.4px; }
+.report-hero-sub { font-size: 13px; color: rgba(255,255,255,0.75); margin: 0; }
+
+/* ── Alert wrap ── */
+.report-alert-wrap { padding: 16px 32px 0; }
+
+/* ── Grid layout (mirrors settings-grid / profile-grid) ── */
+.report-grid-wrap { padding: 16px 32px 0; flex: 1; }
+.report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.report-col { display: flex; flex-direction: column; gap: 18px; }
+
+/* ── Cards (identical to .s-card / .p-card) ── */
+.r-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+.r-card--actions { padding: 18px 22px; }
+.r-card-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+.r-card-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.r-card-title { font-size: 15px; font-weight: 700; color: var(--text); margin: 0 0 2px; }
+.r-card-sub { font-size: 12px; color: var(--muted); margin: 0; }
+.r-card-body { display: flex; flex-direction: column; }
+.section-badge { background: #eff6ff; color: #1d4ed8; border-radius: 10px; font-size: 10px; font-weight: 700; padding: 2px 8px; margin-left: auto; align-self: flex-start; }
+.bcwd-app.dark .section-badge { background: rgba(29,78,216,0.2); color: #60a5fa; }
+
+/* ── Location ── */
+.btn-pin { background: transparent; color: #1d4ed8; border: 1.5px solid #1d4ed8; border-radius: 10px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-pin--full { width: 100%; justify-content: center; margin-bottom: 10px; }
+.btn-pin:hover { background: rgba(29,78,216,0.06); }
+.bcwd-app.dark .btn-pin { color: #60a5fa; border-color: #60a5fa; }
+.bcwd-app.dark .btn-pin:hover { background: rgba(59,130,246,0.1); }
+.pin-status { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; }
+.pin-status--ok { background: #dcfce7; color: #166534; }
+.pin-status--empty { background: var(--surface2); color: var(--muted); }
+.bcwd-app.dark .pin-status--ok { background: rgba(34,197,94,0.12); color: #4ade80; }
+.location-hint { font-size: 12px; color: var(--muted); margin: 0; line-height: 1.5; }
+
+/* ── File upload ── */
+.file-upload-area { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 2px dashed var(--border); border-radius: 12px; padding: 20px 16px; cursor: pointer; transition: all 0.2s; margin-bottom: 12px; }
+.file-upload-area:hover { border-color: #1d4ed8; background: rgba(29,78,216,0.03); }
+.file-upload-area--dark { border-color: rgba(255,255,255,0.12); }
+.file-upload-area--dark:hover { border-color: #60a5fa; background: rgba(59,130,246,0.06); }
+.file-upload-text { font-size: 13px; font-weight: 600; color: var(--text2); }
+.file-upload-hint { font-size: 11px; color: var(--muted); }
+.file-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+/* ── Previews ── */
+.previews-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+.preview-item { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--surface2); }
+.preview-img { width: 100%; height: 80px; object-fit: cover; display: block; }
+.preview-remove { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 5px; background: rgba(0,0,0,0.55); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.preview-name { font-size: 9px; color: var(--muted); padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Buttons ── */
+.btn-primary { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; border: none; border-radius: 10px; padding: 11px 24px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; transition: all 0.2s; box-shadow: 0 4px 12px rgba(29,78,216,0.3); font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(29,78,216,0.4); }
+.btn-primary--disabled { opacity: 0.55; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+.btn-outline { background: transparent; color: #1d4ed8; border: 1.5px solid #1d4ed8; border-radius: 10px; padding: 11px 20px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-outline:hover { background: rgba(29,78,216,0.06); }
+.bcwd-app.dark .btn-outline { color: #60a5fa; border-color: #60a5fa; }
+
+/* ── Actions card ── */
+.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.submit-hint { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); margin: 12px 0 0; }
+
+/* ── Footer ── */
+.bcwd-footer { background: #1e3a8a; color: white; padding: 10px 0; font-size: 12px; margin-top: 20px; }
+.footer-row { max-width: 100%; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.footer-contacts { display: flex; gap: 16px; opacity: 0.8; }
+.footer-contacts span { display: flex; align-items: center; gap: 5px; }
+
+/* ── Dialogs ── */
+:deep(.v-dialog > .v-overlay__content > *) { background: #ffffff !important; border-radius: 20px !important; }
+.bcwd-app.dark :deep(.v-dialog > .v-overlay__content > *) { background: #0f1e35 !important; }
+.bcwd-dialog { background: #ffffff !important; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.22); }
+.bcwd-app.dark .bcwd-dialog { background: #0f1e35 !important; }
+.dialog-bar { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+.dialog-bar-left { display: flex; align-items: center; gap: 10px; }
+.dialog-bar-left h3 { font-size: 15px; font-weight: 700; color: white; margin: 0; }
+.dialog-x { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.dialog-x:hover { background: rgba(255,255,255,0.2); }
+.dialog-body { padding: 22px; background: #ffffff !important; }
+.bcwd-app.dark .dialog-body { background: #0f1e35 !important; }
+.dialog-foot { padding: 14px 22px; background: #f8fafc !important; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; }
+.bcwd-app.dark .dialog-foot { background: #0c1828 !important; border-top-color: rgba(255,255,255,0.09); }
+
+/* ── Vuetify overrides ── */
+:deep(.v-field) { border-radius: 10px !important; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .report-hero { margin: 20px 16px 0; }
+  .report-hero-content { padding: 22px 20px; }
+  .report-alert-wrap { padding: 14px 16px 0; }
+  .report-grid-wrap { padding: 14px 16px 0; }
+  .report-grid { grid-template-columns: 1fr; }
+  .footer-row { padding: 0 16px; }
 }
-.text-black {
-  color: #000000;
-}
-.bg-grey-lighten-5 {
-  background-color: #f5f5f5;
-}
-.bg-grey-darken-4 {
-  background-color: #121212;
-}
-/* header tweaks */
-.header-bar {
-  color: #fff;
-}
-.header-sub {
-  opacity: 0.9;
-  color: rgba(255, 255, 255, 0.9);
-}
-/* small styling for PH time */
-.ph-time {
-  color: rgba(255, 255, 255, 0.95);
-  font-weight: 500;
-  white-space: nowrap;
-}
-/* Card styling */
-.modern-card {
-  transition: all 0.3s ease;
-}
-.modern-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-}
-/* Ensure main content has enough space on mobile */
-.v-main {
-  min-height: calc(100vh - 64px) !important;
-}
-/* Remove any potential white gaps */
-.v-application .v-main {
-  padding-bottom: 0 !important;
-}
-.v-container {
-  padding-bottom: 0 !important;
-}
-/* Add this to your style section */
-.v-container {
-  max-width: 100% !important;
-}
-@media (min-width: 600px) {
-  .v-container {
-    padding-left: 24px !important;
-    padding-right: 24px !important;
-  }
-}
-/* Footer background colors */
-.bg-footer-light {
-  background-color: #0f5088;
-}
-.bg-footer-dark {
-  background-color: #0b1116;
-}
-/* footer tweaks */
-.footer-bar {
-  color: #fff;
-}
-.footer-links a {
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-  font-size: 0.875rem;
-}
-/* Footer responsive styles */
-.footer-content {
-  flex-wrap: nowrap;
-  min-height: 52px;
-}
-.footer-section .text-caption {
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-.contacts {
-  gap: 0;
-}
-.contact-item,
-.divider-item {
-  transition: all 0.3s ease;
-}
-.divider-item {
-  opacity: 0.3;
-}
-/* Ensure consistent spacing on all screen sizes */
-@media (max-width: 1279px) {
-  .footer-section .text-caption {
-    font-size: 0.7rem;
-  }
-}
-@media (max-width: 959px) {
-  .footer-content {
-    flex-wrap: wrap !important;
-    justify-content: center !important;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-  }
-  .contacts {
-    order: 1;
-    flex: 1 1 100%;
-    justify-content: center;
-    margin: 0.5rem 0;
-  }
-  .copyright {
-    order: 2;
-  }
-  .timezone {
-    order: 3;
-  }
-}
-@media (max-width: 767px) {
-  .contacts {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  .contact-item {
-    flex: 1 1 calc(50% - 1rem);
-    justify-content: center;
-    min-width: 140px;
-  }
-  .divider-item {
-    display: none;
-  }
-}
-/* Mobile footer inside main */
-.footer-mobile-content {
-  width: 100%;
-}
-.footer-content-mobile {
-  color: white;
-}
-.footer-contacts-mobile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.contact-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-/* Ensure white text colors */
-.text-white {
-  color: white !important;
-}
-/* Mobile responsiveness */
-@media (max-width: 1279px) {
-  .footer-section .text-caption {
-    font-size: 0.7rem;
-  }
-}
-@media (max-width: 959px) {
-  .footer-content {
-    flex-wrap: wrap !important;
-    justify-content: center !important;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-  }
-  .footer-section {
-    justify-content: center !important;
-    flex: 1 1 100%;
-  }
-  .contacts {
-    order: 1;
-    gap: 0.75rem;
-  }
-  .copyright {
-    order: 2;
-  }
-  .timezone {
-    order: 3;
-  }
-  .footer-section .text-caption {
-    font-size: 0.65rem;
-  }
-  .contact-item .v-icon {
-    margin-right: 2px !important;
-  }
-}
-@media (max-width: 767px) {
-  .contacts {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  .contact-item {
-    flex: 1 1 calc(50% - 1rem);
-    justify-content: center;
-    min-width: 140px;
-  }
-  .divider-item {
-    display: none;
-  }
-  .footer-section .text-caption {
-    font-size: 0.6rem;
-  }
-  .footer-content-mobile .text-caption {
-    font-size: 0.75rem;
-  }
-}
-@media (max-width: 599px) {
-  .footer-content-mobile .text-caption {
-    font-size: 0.7rem;
-  }
-  .contact-line .text-caption {
-    font-size: 0.65rem;
-  }
-}
-@media (max-width: 420px) {
-  .footer-content {
-    gap: 0.25rem;
-  }
-  .footer-section .text-caption {
-    font-size: 0.5rem;
-  }
-  .footer-content-mobile .text-caption {
-    font-size: 0.65rem;
-  }
-  .contact-line .text-caption {
-    font-size: 0.6rem;
-  }
-  .contact-item .v-icon {
-    font-size: 10px !important;
-  }
-}
-/* Very small screens */
-@media (max-width: 360px) {
-  .footer-bar {
-    min-height: 48px;
-  }
-  .footer-content-mobile .text-caption {
-    font-size: 0.6rem;
-  }
-  .contact-line .text-caption {
-    font-size: 0.55rem;
-  }
-}
-/* ============================= */
-/* FULL-WIDTH HEADER DEPTH */
-/* ============================= */
-.admin-header {
-  position: relative;
-  padding: 0 !important; /* remove vuetify internal padding */
-  overflow: hidden;
-  z-index: 20;
-  /* elevation */
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.25),
-    0 6px 18px rgba(0, 0, 0, 0.18);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-/* true full-width depth layer */
-.header-depth-layer {
-  position: absolute;
-  inset: 0;
-  width: 100vw; /* force viewport width */
-  left: 50%;
-  transform: translateX(-50%); /* center it */
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.14),
-    rgba(255, 255, 255, 0.04),
-    rgba(0, 0, 0, 0.22)
-  );
-  z-index: 0;
-}
-/* content wrapper */
-.header-inner {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-/* text depth */
-.header-title {
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
-  letter-spacing: 0.4px;
-}
-.header-right {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-/* dark mode tuning */
-.v-theme--dark .admin-header {
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.55),
-    0 10px 28px rgba(0, 0, 0, 0.65);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+@media (max-width: 600px) {
+  .report-hero { margin: 12px 12px 0; }
+  .report-alert-wrap { padding: 12px 12px 0; }
+  .report-grid-wrap { padding: 12px 12px 0; }
+  .report-hero-title { font-size: 18px; }
+  .form-actions { flex-direction: column-reverse; align-items: stretch; }
+  .btn-primary, .btn-outline { justify-content: center; width: 100%; }
 }
 </style>

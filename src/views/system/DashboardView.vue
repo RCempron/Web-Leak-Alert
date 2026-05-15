@@ -1,4 +1,4 @@
-<!-- src/views/system/DashboardView.vue -->
+<!-- src/views/system/DashboardView.vue — BCWD Redesign 2025 v2 -->
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed, onActivated, nextTick } from 'vue'
 import { useDisplay, useTheme } from 'vuetify'
@@ -7,181 +7,81 @@ import { supabase } from '@/utils/supabase.js'
 import AlertNotification from '@/components/common/AlertNotification.vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+
 const { mobile } = useDisplay()
 const router = useRouter()
 const vuetifyTheme = useTheme()
-// ── Theme ───────────────────────────────────────────────
+
 const theme = ref(localStorage.getItem('theme') ?? 'light')
 vuetifyTheme.change(theme.value)
-watch(theme, (newTheme) => {
-  localStorage.setItem('theme', newTheme)
-  vuetifyTheme.change(newTheme)
-  showSnackbar('Theme changed')
-})
-function toggleTheme() {
-  theme.value = theme.value === 'light' ? 'dark' : 'light'
-}
-// ── Real-time PH Time ───────────────────────────────────
+watch(theme, (newTheme) => { localStorage.setItem('theme', newTheme); vuetifyTheme.change(newTheme); showSnackbar('Theme changed') })
+function toggleTheme() { theme.value = theme.value === 'light' ? 'dark' : 'light' }
+
 const phTime = ref('')
 let timer = null
 const timeFormat = ref(localStorage.getItem('timeFormat') || '24')
-watch(timeFormat, (val) => {
-  localStorage.setItem('timeFormat', val)
-  updatePhTime()
-  showSnackbar('Time format changed')
-})
+watch(timeFormat, (val) => { localStorage.setItem('timeFormat', val); updatePhTime(); showSnackbar('Time format changed') })
 function updatePhTime() {
-  const now = new Date()
-  phTime.value = new Intl.DateTimeFormat('en-PH', {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: timeFormat.value === '12',
-    timeZone: 'Asia/Manila',
-  }).format(now)
+  phTime.value = new Intl.DateTimeFormat('en-PH', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: timeFormat.value === '12', timeZone: 'Asia/Manila' }).format(new Date())
 }
-onMounted(() => {
-  updatePhTime()
-  timer = setInterval(updatePhTime, 1000)
-})
-onUnmounted(() => {
-  if (timer) clearInterval(timer)
-})
-// ── Reports & Filtering ─────────────────────────────────
+onMounted(() => { updatePhTime(); timer = setInterval(updatePhTime, 1000) })
+onUnmounted(() => { if (timer) clearInterval(timer) })
+
 const updatedReports = ref(new Set())
 const lastViewedUpdates = ref(JSON.parse(localStorage.getItem('lastViewedUpdates') || '{}'))
 const notificationCount = computed(() => updatedReports.value.size)
 const showUpdatedOnly = ref(false)
-function showUpdatedReports() {
-  currentView.value = 'dashboard'
-  showUpdatedOnly.value = true
-  currentStatus.value = 'all'
-  selectedType.value = 'all'
-  page.value = 1
-}
-function resetToAllReports() {
-  showUpdatedOnly.value = false
-  currentStatus.value = 'all'
-  selectedType.value = 'all'
-  page.value = 1
-}
+function showUpdatedReports() { currentView.value = 'dashboard'; showUpdatedOnly.value = true; currentStatus.value = 'all'; selectedType.value = 'all'; page.value = 1 }
+function resetToAllReports() { showUpdatedOnly.value = false; currentStatus.value = 'all'; selectedType.value = 'all'; page.value = 1 }
+
 const reports = ref([])
 async function fetchReports() {
   const { data: userData } = await supabase.auth.getUser()
   if (!userData?.user) return
-  const { data } = await supabase
-    .from('reports')
-    .select('*')
-    .eq('user_id', userData.user.id)
-    .order('created_at', { ascending: false })
+  const { data } = await supabase.from('reports').select('*').eq('user_id', userData.user.id).order('created_at', { ascending: false })
   reports.value = data || []
 }
-const baseReportsForFiltering = computed(() => {
-  if (!showUpdatedOnly.value) return reports.value
-  return reports.value.filter((r) => updatedReports.value.has(r.id))
-})
+
+const baseReportsForFiltering = computed(() => showUpdatedOnly.value ? reports.value.filter(r => updatedReports.value.has(r.id)) : reports.value)
 const statusCounts = computed(() => {
-  const counts = {
-    all: baseReportsForFiltering.value.length,
-    pending: 0,
-    ongoing: 0,
-    resolved: 0,
-    rejected: 0,
-  }
-  baseReportsForFiltering.value.forEach((r) => {
-    if (r.status in counts) counts[r.status]++
-  })
-  return counts
+  const c = { all: baseReportsForFiltering.value.length, pending: 0, ongoing: 0, resolved: 0, rejected: 0 }
+  baseReportsForFiltering.value.forEach(r => { if (r.status in c) c[r.status]++ })
+  return c
 })
 const typeCounts = computed(() => {
-  const counts = {}
-  baseReportsForFiltering.value.forEach((r) => {
-    const t = (r.type || 'other').toLowerCase()
-    counts[t] = (counts[t] || 0) + 1
-  })
-  return counts
+  const c = {}
+  baseReportsForFiltering.value.forEach(r => { const t = (r.type || 'other').toLowerCase(); c[t] = (c[t] || 0) + 1 })
+  return c
 })
 const currentStatus = ref('all')
 const selectedType = ref('all')
 const filteredReports = computed(() => {
-  let filtered = baseReportsForFiltering.value
-  if (currentStatus.value !== 'all')
-    filtered = filtered.filter((r) => r.status === currentStatus.value)
-  if (selectedType.value && selectedType.value !== 'all') {
-    filtered = filtered.filter((r) => (r.type || 'other').toLowerCase() === selectedType.value)
-  }
-  return filtered
+  let f = baseReportsForFiltering.value
+  if (currentStatus.value !== 'all') f = f.filter(r => r.status === currentStatus.value)
+  if (selectedType.value && selectedType.value !== 'all') f = f.filter(r => (r.type || 'other').toLowerCase() === selectedType.value)
+  return f
 })
 const page = ref(1)
 const itemsPerPage = ref(parseInt(localStorage.getItem('itemsPerPage')) || 10)
-watch(itemsPerPage, (val) => {
-  localStorage.setItem('itemsPerPage', val.toString())
-  showSnackbar('Items per page changed')
-  page.value = 1
-})
-const paginatedReports = computed(() => {
-  const start = (page.value - 1) * itemsPerPage.value
-  return filteredReports.value.slice(start, start + itemsPerPage.value)
-})
-const paginationLength = computed(() =>
-  Math.ceil(filteredReports.value.length / itemsPerPage.value),
-)
-// ── UPDATED ICONS (water leak & broken pipe now different) ───────
-const typeIcons = {
-  'low pressure': 'mdi-water',
-  'broken pipe': 'mdi-pipe-disconnected', // ← clear broken pipe
-  'dark colored water': 'mdi-water-alert',
-  contamination: 'mdi-water-alert',
-  'water leak': 'mdi-pipe-leak', // ← classic leaking pipe
-  'no water': 'mdi-water-off',
-  other: 'mdi-help-circle',
-}
-const typeColors = {
-  'low pressure': 'red',
-  'broken pipe': 'red',
-  'dark colored water': 'orange',
-  contamination: 'orange',
-  'water leak': 'red',
-  'no water': 'red',
-  other: 'grey',
-}
-const statusColors = {
-  pending: 'amber',
-  ongoing: 'blue',
-  resolved: 'green',
-  rejected: 'red',
-}
-const statusTextColors = {
-  pending: '#FFA726',
-  ongoing: '#42A5F5',
-  resolved: '#66BB6A',
-  rejected: '#EF5350',
-}
-const statusHexColors = {
-  pending: '#FFA726',
-  ongoing: '#42A5F5',
-  resolved: '#66BB6A',
-  rejected: '#EF5350',
-}
+watch(itemsPerPage, (val) => { localStorage.setItem('itemsPerPage', val.toString()); showSnackbar('Items per page changed'); page.value = 1 })
+const paginatedReports = computed(() => { const s = (page.value - 1) * itemsPerPage.value; return filteredReports.value.slice(s, s + itemsPerPage.value) })
+const paginationLength = computed(() => Math.ceil(filteredReports.value.length / itemsPerPage.value))
+
+const typeIcons = { 'low pressure': 'mdi-water', 'broken pipe': 'mdi-pipe-disconnected', 'dark colored water': 'mdi-water-alert', contamination: 'mdi-water-alert', 'water leak': 'mdi-pipe-leak', 'no water': 'mdi-water-off', other: 'mdi-help-circle' }
+const typeColors = { 'low pressure': 'red', 'broken pipe': 'red', 'dark colored water': 'orange', contamination: 'orange', 'water leak': 'red', 'no water': 'red', other: 'grey' }
+const statusHexColors = { pending: '#f59e0b', ongoing: '#3b82f6', resolved: '#22c55e', rejected: '#ef4444' }
+
 const userName = ref('')
 async function fetchUser() {
   const { data } = await supabase.auth.getUser()
-  const metadata = data?.user?.user_metadata || {}
-  userName.value =
-    `${metadata.firstname || ''} ${metadata.lastname || ''}`.trim() ||
-    data?.user?.email?.split('@')[0] ||
-    'User'
+  const m = data?.user?.user_metadata || {}
+  userName.value = `${m.firstname || ''} ${m.lastname || ''}`.trim() || data?.user?.email?.split('@')[0] || 'User'
 }
-// ── Report Dialog & Image Viewer ────────────────────────
+
 const dialog = ref(false)
 const selectedReport = ref(null)
 function openReportDetails(report) {
-  selectedReport.value = report
-  dialog.value = true
+  selectedReport.value = report; dialog.value = true
   lastViewedUpdates.value[report.id] = report.updated_at
   localStorage.setItem('lastViewedUpdates', JSON.stringify(lastViewedUpdates.value))
   updatedReports.value.delete(report.id)
@@ -189,1591 +89,817 @@ function openReportDetails(report) {
 const showImageViewer = ref(false)
 const activeImage = ref('')
 const zoomLevel = ref(1)
-function openImageViewer(img) {
-  activeImage.value = img
-  zoomLevel.value = 1
-  showImageViewer.value = true
-}
-function zoomIn() {
-  zoomLevel.value = Math.min(zoomLevel.value + 0.25, 3)
-}
-function zoomOut() {
-  zoomLevel.value = Math.max(zoomLevel.value - 0.25, 0.5)
-}
-function resetZoom() {
-  zoomLevel.value = 1
-}
-// ── Sidebar ─────────────────────────────────────────────
+function openImageViewer(img) { activeImage.value = img; zoomLevel.value = 1; showImageViewer.value = true }
+function zoomIn() { zoomLevel.value = Math.min(zoomLevel.value + 0.25, 3) }
+function zoomOut() { zoomLevel.value = Math.max(zoomLevel.value - 0.25, 0.5) }
+function resetZoom() { zoomLevel.value = 1 }
+
 const drawer = ref(!mobile.value)
 const rail = ref(false)
-function toggleSidebar() {
-  if (mobile.value) drawer.value = !drawer.value
-  else rail.value = !rail.value
-}
-watch(mobile, (isMobile) => {
-  if (isMobile) {
-    drawer.value = false
-    rail.value = false
-  } else {
-    drawer.value = true
-    rail.value = false
-  }
-})
-// ── Data Loading ────────────────────────────────────────
+function toggleSidebar() { if (mobile.value) drawer.value = !drawer.value; else rail.value = !rail.value }
+watch(mobile, (isMobile) => { if (isMobile) { drawer.value = false; rail.value = false } else { drawer.value = true; rail.value = false } })
+
 async function loadData() {
-  await fetchReports()
-  await fetchUser()
-  const updated = reports.value.filter((r) => {
-    const lastViewed = lastViewedUpdates.value[r.id]
-    const updatedDate = new Date(r.updated_at)
-    const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0)
-    return r.status !== 'pending' && r.updated_at && updatedDate > lastViewedDate
-  })
-  updatedReports.value = new Set(updated.map((r) => r.id))
+  await fetchReports(); await fetchUser()
+  const updated = reports.value.filter(r => { const lv = lastViewedUpdates.value[r.id]; return r.status !== 'pending' && r.updated_at && new Date(r.updated_at) > new Date(lv || 0) })
+  updatedReports.value = new Set(updated.map(r => r.id))
 }
 onMounted(loadData)
 onActivated(loadData)
-// ── Profile ─────────────────────────────────────────────
-const loading = ref(false)
-const saving = ref(false)
-const editing = ref(false)
-const user = ref(null)
-const email = ref('')
-const firstname = ref('')
-const lastname = ref('')
-const age = ref('')
-const residency = ref('')
-const formSuccessMessage = ref('')
-const formErrorMessage = ref('')
+
+const loading = ref(false); const saving = ref(false); const editing = ref(false)
+const user = ref(null); const email = ref(''); const firstname = ref(''); const lastname = ref('')
+const age = ref(''); const residency = ref('')
+const formSuccessMessage = ref(''); const formErrorMessage = ref('')
 async function loadCurrentUser() {
   loading.value = true
   try {
     const { data, error } = await supabase.auth.getUser()
     if (error) throw error
     user.value = data?.user ?? null
-    email.value = user.value?.email || ''
-    firstname.value = user.value?.user_metadata?.firstname || ''
-    lastname.value = user.value?.user_metadata?.lastname || ''
-    age.value = user.value?.user_metadata?.age || ''
+    email.value = user.value?.email || ''; firstname.value = user.value?.user_metadata?.firstname || ''
+    lastname.value = user.value?.user_metadata?.lastname || ''; age.value = user.value?.user_metadata?.age || ''
     residency.value = user.value?.user_metadata?.residency || ''
-  } catch (err) {
-    formErrorMessage.value = err?.message || String(err)
-  } finally {
-    loading.value = false
-  }
+  } catch (err) { formErrorMessage.value = err?.message || String(err) }
+  finally { loading.value = false }
 }
 async function saveProfile() {
-  if (!firstname.value || !lastname.value) {
-    formErrorMessage.value = 'Please fill out all required fields.'
-    return
-  }
-  saving.value = true
-  formErrorMessage.value = ''
-  formSuccessMessage.value = ''
+  if (!firstname.value || !lastname.value) { formErrorMessage.value = 'Please fill out all required fields.'; return }
+  saving.value = true; formErrorMessage.value = ''; formSuccessMessage.value = ''
   try {
-    const { data, error } = await supabase.auth.updateUser({
-      data: {
-        firstname: firstname.value,
-        lastname: lastname.value,
-        age: age.value,
-        residency: residency.value,
-      },
-    })
+    const { data, error } = await supabase.auth.updateUser({ data: { firstname: firstname.value, lastname: lastname.value, age: age.value, residency: residency.value } })
     if (error) throw error
-    user.value = data?.user ?? user.value
-    formSuccessMessage.value = 'Profile updated successfully.'
-    editing.value = false
-    await fetchUser()
-  } catch (err) {
-    formErrorMessage.value = err?.message || String(err)
-  } finally {
-    saving.value = false
-  }
+    user.value = data?.user ?? user.value; formSuccessMessage.value = 'Profile updated successfully.'; editing.value = false; await fetchUser()
+  } catch (err) { formErrorMessage.value = err?.message || String(err) }
+  finally { saving.value = false }
 }
 const currentView = ref('dashboard')
 onMounted(loadCurrentUser)
-// ── Snackbar ────────────────────────────────────────────
-const snackbar = ref(false)
-const snackbarMessage = ref('')
-function showSnackbar(message) {
-  snackbarMessage.value = message
-  snackbar.value = true
-}
-async function logout() {
-  await supabase.auth.signOut()
-  router.push('/login')
-}
-function handleMobileNav(view) {
-  currentView.value = view
-  if (mobile.value) drawer.value = false
-}
-// ── Avatar ──────────────────────────────────────────────
-const colors = [
-  'red',
-  'pink',
-  'purple',
-  'deep-purple',
-  'indigo',
-  'blue',
-  'light-blue',
-  'cyan',
-  'teal',
-  'green',
-  'light-green',
-  'lime',
-  'yellow',
-  'amber',
-  'orange',
-  'deep-orange',
-]
-const initial = computed(() => userName.value.charAt(0).toUpperCase() || 'U')
-const avatarColor = computed(() => {
-  if (!userName.value) return 'grey'
-  const index = Math.abs(userName.value.charCodeAt(0)) % colors.length
-  return colors[index]
-})
-// ── Map Integration for Pinning ─────────────────────────
-const mapInstance = ref(null)
-const markerInstance = ref(null)
-const showMapDialog = ref(false)
 
+const snackbar = ref(false); const snackbarMessage = ref('')
+function showSnackbar(message) { snackbarMessage.value = message; snackbar.value = true }
+async function logout() { await supabase.auth.signOut(); router.push('/login') }
+function handleMobileNav(view) { currentView.value = view; if (mobile.value) drawer.value = false }
+
+const colors = ['red','pink','purple','deep-purple','indigo','blue','cyan','teal','green','light-green']
+const initial = computed(() => userName.value.charAt(0).toUpperCase() || 'U')
+const avatarColor = computed(() => { if (!userName.value) return 'grey'; return colors[Math.abs(userName.value.charCodeAt(0)) % colors.length] })
+
+const mapInstance = ref(null); const markerInstance = ref(null); const showMapDialog = ref(false)
 watch(showMapDialog, async (newVal) => {
   if (newVal) {
     await nextTick()
-    // Ensure map container is ready and visible
     const mapContainer = document.getElementById('report-map')
     if (!mapContainer) return
-    
-    // Initialize map centered on Cagayan de Oro
-    mapInstance.value = L.map('report-map', { 
-      preferCanvas: true,
-      zoomControl: true,
-      dragging: true
-    }).setView([8.4542, 124.6319], 13)
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(mapInstance.value)
-    
-    // Reset marker when opening dialog
+    mapInstance.value = L.map('report-map', { preferCanvas: true, zoomControl: true, dragging: true }).setView([8.4542, 124.6319], 13)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(mapInstance.value)
     markerInstance.value = null
-    
-    // Wait for dialog to fully render, then trigger map resize
-    await new Promise(resolve => {
-      setTimeout(() => {
-        if (mapInstance.value) {
-          mapInstance.value.invalidateSize(true)
-        }
-        resolve()
-      }, 300)
-    })
-    
-    // If report already has coordinates, show marker
+    await new Promise(resolve => setTimeout(() => { if (mapInstance.value) mapInstance.value.invalidateSize(true); resolve() }, 300))
     if (selectedReport.value?.latitude && selectedReport.value?.longitude) {
       const latLng = [selectedReport.value.latitude, selectedReport.value.longitude]
       markerInstance.value = L.marker(latLng).addTo(mapInstance.value)
       mapInstance.value.setView(latLng, 15)
     }
-    
-    // Add click handler to map
-    mapInstance.value.on('click', (e) => {
-      // Remove old marker if exists
-      if (markerInstance.value) {
-        markerInstance.value.remove()
-      }
-      // Add new marker at clicked location
-      markerInstance.value = L.marker(e.latlng).addTo(mapInstance.value)
-    })
+    mapInstance.value.on('click', e => { if (markerInstance.value) markerInstance.value.remove(); markerInstance.value = L.marker(e.latlng).addTo(mapInstance.value) })
   } else {
-    // Clean up map on dialog close
-    if (mapInstance.value) {
-      mapInstance.value.off('click')
-      mapInstance.value.remove()
-      mapInstance.value = null
-      markerInstance.value = null
-    }
+    if (mapInstance.value) { mapInstance.value.off('click'); mapInstance.value.remove(); mapInstance.value = null; markerInstance.value = null }
   }
 })
-
 async function savePin() {
-  if (!markerInstance.value) {
-    showSnackbar('Please select a location on the map first')
-    return
-  }
-  
+  if (!markerInstance.value) { showSnackbar('Please select a location first'); return }
   try {
     const { lat, lng } = markerInstance.value.getLatLng()
-    const { error } = await supabase
-      .from('reports')
-      .update({ latitude: lat, longitude: lng })
-      .eq('id', selectedReport.value.id)
-    
+    const { error } = await supabase.from('reports').update({ latitude: lat, longitude: lng }).eq('id', selectedReport.value.id)
     if (error) throw error
-    
-    selectedReport.value.latitude = lat
-    selectedReport.value.longitude = lng
-    showSnackbar('Location pinned successfully')
-    showMapDialog.value = false
-    await fetchReports()
-  } catch (err) {
-    console.error('Save pin error:', err)
-    showSnackbar('Error saving location: ' + err.message)
-  }
+    selectedReport.value.latitude = lat; selectedReport.value.longitude = lng
+    showSnackbar('Location pinned successfully'); showMapDialog.value = false; await fetchReports()
+  } catch (err) { showSnackbar('Error saving location: ' + err.message) }
 }
 </script>
+
 <template>
-  <v-app class="dashboard-app" :theme="theme">
-    <!-- App Bar -->
-    <v-app-bar
-      flat
-      density="comfortable"
-      :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-      class="consumer-header"
-    >
-      <div class="consumer-header-depth"></div>
-      <div class="consumer-header-inner px-2 px-sm-6">
-        <v-toolbar-title class="font-weight-bold consumer-header-title"
-          >BCWD Complaint System</v-toolbar-title
-        >
-        <v-spacer />
-        <div class="d-flex align-center gap-3 consumer-header-right">
-          <div
-            class="text-caption text-white font-weight-medium ph-time"
-            :class="{ 'd-none d-sm-block': mobile }"
-          >
-            {{ phTime }}
-          </div>
+  <v-app :class="['bcwd-app', theme]">
+
+    <!-- ─── App Bar — WHITE (matches RegisterView) ─── -->
+    <v-app-bar flat height="56" :class="['bcwd-header', theme]">
+      <div class="header-inner">
+        <button class="menu-btn" @click="toggleSidebar" aria-label="Toggle menu">
+          <v-icon size="22" color="#1e40af">mdi-menu</v-icon>
+        </button>
+        <div class="header-brand">
+          <v-img src="/images/logo.png" width="28" height="28" class="header-img" />
+          <span class="header-title">BCWD Complaint System</span>
+        </div>
+        <div class="header-right">
+          <span class="header-time d-none d-sm-block">{{ phTime }}</span>
         </div>
       </div>
     </v-app-bar>
-    <!-- Navigation Drawer -->
-    <v-navigation-drawer
-      v-model="drawer"
-      :temporary="mobile"
-      :rail="!mobile && rail"
-      :width="260"
-      :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-    >
-      <v-list nav density="compact">
-        <div
-          class="sidebar-profile pa-5 d-flex flex-column align-center"
-          :class="{ 'd-none': !mobile && rail }"
-        >
-          <v-avatar :color="avatarColor" size="80" class="mb-4 elevation-6 profile-avatar">
-            <span class="text-h5 white--text">{{ initial }}</span>
-          </v-avatar>
-          <div class="admin-info text-center">
-            <div class="admin-name text-h6 font-weight-medium mb-1">{{ userName }}</div>
-            <div class="admin-role text-caption opacity-70">Consumer</div>
-          </div>
+
+    <!-- ─── Sidebar — LIGHT BLUE ─── -->
+    <v-navigation-drawer v-model="drawer" :temporary="mobile" :rail="!mobile && rail" :width="250" class="bcwd-sidebar">
+      <!-- Profile section -->
+      <div class="sidebar-profile" :class="{ 'sidebar-profile--rail': !mobile && rail }">
+        <v-avatar :color="avatarColor" size="52" class="profile-av">
+          <span class="av-text">{{ initial }}</span>
+        </v-avatar>
+        <div class="profile-meta" v-if="!(!mobile && rail)">
+          <p class="profile-name">{{ userName }}</p>
+          <p class="profile-role">Consumer</p>
         </div>
-        <v-divider class="my-3 mx-4" :class="{ 'mt-6': !mobile && rail }" />
-        <v-list-item
-          :active="currentView === 'dashboard'"
-          prepend-icon="mdi-view-dashboard"
-          title="Dashboard"
-          @click="handleMobileNav('dashboard')"
-        />
-        <v-list-item
-          :active="currentView === 'profile'"
-          prepend-icon="mdi-account-circle"
-          title="Profile"
-          @click="handleMobileNav('profile')"
-        />
-        <v-list-item
-          :active="currentView === 'settings'"
-          prepend-icon="mdi-cog"
-          title="Settings"
-          @click="handleMobileNav('settings')"
-        />
-        <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout" class="mt-8" />
-      </v-list>
-      <div class="sidebar-lump" @click="toggleSidebar">
-        <v-icon size="22">{{ drawer ? 'mdi-chevron-left' : 'mdi-chevron-right' }}</v-icon>
+      </div>
+      <div class="sidebar-sep" />
+
+      <!-- Nav items -->
+      <nav class="sidebar-nav">
+        <button :class="['s-nav-item', { 's-nav-item--active': currentView === 'dashboard' }]" @click="handleMobileNav('dashboard')">
+          <v-icon size="19">mdi-view-dashboard-outline</v-icon>
+          <span v-if="!(!mobile && rail)" class="s-nav-label">Dashboard</span>
+          <div v-if="notificationCount > 0 && !(!mobile && rail)" class="s-nav-badge">{{ notificationCount }}</div>
+        </button>
+        <button :class="['s-nav-item', { 's-nav-item--active': currentView === 'profile' }]" @click="handleMobileNav('profile')">
+          <v-icon size="19">mdi-account-circle-outline</v-icon>
+          <span v-if="!(!mobile && rail)" class="s-nav-label">My Profile</span>
+        </button>
+        <button :class="['s-nav-item', { 's-nav-item--active': currentView === 'settings' }]" @click="handleMobileNav('settings')">
+          <v-icon size="19">mdi-cog-outline</v-icon>
+          <span v-if="!(!mobile && rail)" class="s-nav-label">Settings</span>
+        </button>
+        <button class="s-nav-item s-nav-item--logout" @click="logout">
+          <v-icon size="19">mdi-logout</v-icon>
+          <span v-if="!(!mobile && rail)" class="s-nav-label">Sign Out</span>
+        </button>
+      </nav>
+
+      <!-- Rail toggle -->
+      <div class="rail-lump" @click="toggleSidebar">
+        <v-icon size="16" color="white">{{ (!mobile && rail) ? 'mdi-chevron-right' : 'mdi-chevron-left' }}</v-icon>
       </div>
     </v-navigation-drawer>
-    <!-- Main Content -->
-    <v-main class="dashboard-main" :class="theme === 'light' ? 'bg-grey-lighten-4' : 'bg-grey-darken-4'">
-      <v-container fluid class="pa-4 pa-md-6 pb-6 pb-md-10">
-        <div class="text-center mb-6 mb-md-8">
-          <h2 class="font-weight-bold mb-2" :class="mobile ? 'text-h6' : 'text-h4'">
-            Welcome to BCWD Complaint System
-          </h2>
-          <p class="text-medium-emphasis" :class="mobile ? 'text-caption' : 'text-body-1'">
-            Report and track water-related issues quickly and easily.
-          </p>
-        </div>
-        <!-- Dashboard -->
-        <div v-if="currentView === 'dashboard'">
-          <v-card rounded="lg" elevation="2" class="position-relative">
-            <div class="d-flex align-center justify-space-between py-6 px-6 border-bottom">
-  <div class="text-h5 font-weight-bold">
-    {{ showUpdatedOnly ? 'Updated Reports' : 'My Reports' }}
-  </div>
-  <v-spacer></v-spacer>
-  <div class="d-flex align-center" style="gap: 24px;">
-    <!-- Notification icon moved to header (never gets cut) -->
-    <v-btn
-      v-if="!showUpdatedOnly"
-      icon
-      class="notification-btn"
-      @click="showUpdatedReports"
-    >
-      <v-badge
-        v-if="notificationCount > 0"
-        :content="notificationCount"
-        color="error"
-        floating
-        overlap
-      >
-        <v-icon size="28">mdi-bell-ring</v-icon>
-      </v-badge>
-      <v-icon v-else size="28">mdi-bell-ring</v-icon>
-    </v-btn>
 
-    <v-btn
-      color="primary"
-      prepend-icon="mdi-plus"
-      variant="flat"
-      size="large"
-      @click="router.push('/report')"
-      class="new-report-btn"
-    >
-      New Report
-    </v-btn>
-  </div>
-</div>
-            <v-alert
-              v-if="showUpdatedOnly"
-              density="compact"
-              variant="tonal"
-              class="mx-6 mb-4 rounded-xl"
-              elevation="2"
-            >
-              <div class="d-flex align-center gap-3 flex-wrap">
-                <div>
-                  Showing <strong>{{ notificationCount }}</strong> new report update{{
-                    notificationCount !== 1 ? 's' : ''
-                  }}
-                </div>
-                <v-spacer />
-                <v-btn
-                  color="primary"
-                  prepend-icon="mdi-arrow-left"
-                  variant="flat"
-                  @click="resetToAllReports"
-                  >Go back to all reports</v-btn
-                >
-              </div>
-            </v-alert>
-            <v-card-text class="px-6 pb-6">
-              <v-chip-group v-if="!showUpdatedOnly" v-model="currentStatus" mandatory class="mb-6">
-  <v-chip
-    value="all"
-    :color="theme === 'light' ? 'primary' : 'blue-darken-2'"
-    variant="flat"
-    size="large"
-    >All <strong class="ml-1">{{ statusCounts.all }}</strong></v-chip
-  >
-  <v-chip value="pending" color="amber" variant="flat" size="large"
-    >Pending <strong class="ml-1">{{ statusCounts.pending }}</strong></v-chip
-  >
-  <v-chip value="ongoing" color="blue" variant="flat" size="large"
-    >Ongoing <strong class="ml-1">{{ statusCounts.ongoing }}</strong></v-chip
-  >
-  <v-chip value="resolved" color="green" variant="flat" size="large"
-    >Resolved <strong class="ml-1">{{ statusCounts.resolved }}</strong></v-chip
-  >
-  <v-chip value="rejected" color="red" variant="flat" size="large"
-    >Rejected <strong class="ml-1">{{ statusCounts.rejected }}</strong></v-chip
-  >
-</v-chip-group>
-              <div v-if="!showUpdatedOnly" class="mb-6">
-                <div class="text-subtitle-1 mb-2">Filter by Type</div>
-                <v-chip-group v-model="selectedType" class="d-flex flex-wrap">
-                  <v-chip value="all" :variant="selectedType === 'all' ? 'flat' : 'outlined'"
-                    >All Reports ({{ baseReportsForFiltering.length }})</v-chip
-                  >
-                  <v-chip
-                    v-for="(count, type) in typeCounts"
-                    :key="type"
-                    :value="type"
-                    :prepend-icon="typeIcons[type]"
-                    :color="typeColors[type]"
-                    :variant="selectedType === type ? 'flat' : 'outlined'"
-                  >
-                    {{ type.charAt(0).toUpperCase() + type.slice(1) }} ({{ count }})
-                  </v-chip>
-                </v-chip-group>
-              </div>
-              <v-row>
-                <v-col cols="12">
-                  <v-card
-                    v-for="report in paginatedReports"
-                    :key="report.id"
-                    class="mb-4"
-                    flat
-                    hover
-                  >
-                    <v-list-item three-line @click="openReportDetails(report)">
-                      <template v-slot:prepend>
-                        <v-icon
-                          :color="typeColors[(report.type || 'other').toLowerCase()]"
-                          size="48"
-                          class="mr-4"
-                        >
-                          {{ typeIcons[(report.type || 'other').toLowerCase()] }}
-                        </v-icon>
-                      </template>
-                      <v-list-item-title class="font-weight-medium">{{
-                        report.type || 'Other'
-                      }}</v-list-item-title>
-                      <v-list-item-subtitle class="mt-1">
-                        <div class="d-flex align-center gap-2">
-                          <div class="text-caption">
-                            Reported: {{ new Date(report.created_at).toLocaleDateString('en-PH') }}
-                          </div>
-                          <v-chip
-                            :color="statusColors[report.status]"
-                            label
-                            size="small"
-                            class="text-capitalize"
-                          >
-                            {{ report.status || 'pending' }}
-                          </v-chip>
-                        </div>
-                      </v-list-item-subtitle>
-                      <template v-slot:append>
-                        <div class="d-flex align-center gap-4">
-                          <v-chip
-                            v-if="updatedReports.has(report.id)"
-                            color="green"
-                            label
-                            size="small"
-                            prepend-icon="mdi-update"
-                            class="mr-2"
-                            >Status Updated</v-chip
-                          >
-                        </div>
-                      </template>
-                    </v-list-item>
-                    <v-divider />
-                  </v-card>
-                  <div v-if="filteredReports.length === 0" class="text-center py-8">
-                    <v-icon size="64" color="grey-lighten-1">mdi-inbox-outline</v-icon>
-                    <div class="text-h6 mt-4">No reports found</div>
-                    <div class="text-body-2 text-medium-emphasis">Try changing your filters</div>
-                  </div>
-                </v-col>
-              </v-row>
-              <div class="text-center mt-6">
-                <v-pagination
-                  v-model="page"
-                  :length="paginationLength"
-                  :total-visible="7"
-                  density="compact"
-                ></v-pagination>
-              </div>
-            </v-card-text>
-          </v-card>
-        </div>
-        <!-- Profile View -->
-        <div v-else-if="currentView === 'profile'">
-          <v-card
-            class="pa-3 pa-sm-5 text-center modern-card mx-auto"
-            :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
-            elevation="10"
-            rounded="xl"
-            max-width="700"
-          >
-            <v-avatar :color="avatarColor" size="90" class="mb-4"
-              ><span class="text-h4 white--text">{{ initial }}</span></v-avatar
-            >
-            <h2 class="font-weight-bold mb-2" :class="mobile ? 'text-h6' : ''">My Profile</h2>
-            <p class="text-medium-emphasis mb-6" :class="mobile ? 'text-body-2' : ''">
-              View or edit your personal information
-            </p>
-            <AlertNotification
-              :form-success-message="formSuccessMessage"
-              :form-error-message="formErrorMessage"
-            />
-            <v-skeleton-loader v-if="loading" type="heading, paragraph, paragraph" class="mb-4" />
-            <div v-else>
-              <v-text-field
-                v-model="email"
-                label="Email"
-                prepend-inner-icon="mdi-email"
-                variant="outlined"
-                class="mb-3"
-                readonly
-              />
-              <v-text-field
-                v-model="firstname"
-                label="First Name"
-                prepend-inner-icon="mdi-account"
-                variant="outlined"
-                class="mb-3"
-                :readonly="!editing"
-              />
-              <v-text-field
-                v-model="lastname"
-                label="Last Name"
-                prepend-inner-icon="mdi-account"
-                variant="outlined"
-                class="mb-3"
-                :readonly="!editing"
-              />
-              <v-text-field
-                v-model="age"
-                label="Age"
-                prepend-inner-icon="mdi-calendar"
-                variant="outlined"
-                class="mb-3"
-                type="number"
-                :readonly="!editing"
-              />
-              <v-text-field
-                v-model="residency"
-                label="Residency"
-                prepend-inner-icon="mdi-home-city"
-                variant="outlined"
-                class="mb-4"
-                :readonly="!editing"
-              />
-              <div class="button-group d-flex flex-wrap justify-center align-center mt-6">
-                <v-btn
-                  v-if="!editing"
-                  color="primary"
-                  size="large"
-                  class="flex-btn"
-                  @click="editing = true"
-                  ><v-icon start>mdi-account-edit</v-icon> Edit Profile</v-btn
-                >
-                <v-btn
-                  v-else
-                  color="success"
-                  size="large"
-                  class="flex-btn"
-                  :loading="saving"
-                  @click="saveProfile"
-                  ><v-icon start>mdi-content-save</v-icon> Save Changes</v-btn
-                >
-                <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'"
-                  ><v-icon start>mdi-arrow-left</v-icon> Back</v-btn
-                >
-                <v-btn
-                  color="error"
-                  variant="outlined"
-                  size="large"
-                  class="flex-btn"
-                  @click="logout"
-                  ><v-icon start>mdi-logout</v-icon> Logout</v-btn
-                >
-              </div>
-            </div>
-          </v-card>
-        </div>
-        <!-- Settings View -->
-        <div v-else-if="currentView === 'settings'">
-          <v-card
-            class="pa-3 pa-sm-5 text-center modern-card mx-auto"
-            :color="theme === 'light' ? 'white' : 'blue-grey-darken-3'"
-            elevation="10"
-            rounded="xl"
-            max-width="700"
-          >
-            <v-avatar size="90" class="mb-4"
-              ><v-icon size="90" color="primary">mdi-cog</v-icon></v-avatar
-            >
-            <h2 class="font-weight-bold mb-2" :class="mobile ? 'text-h6' : ''">Settings</h2>
-            <p class="text-medium-emphasis mb-6" :class="mobile ? 'text-body-2' : ''">
-              Manage your application settings
-            </p>
-            <v-divider class="mb-4" />
-            <v-list lines="one" class="pa-0">
-              <v-list-group value="appearance">
-                <template v-slot:activator="{ props }"
-                  ><v-list-item v-bind="props" prepend-icon="mdi-palette" title="Appearance"
-                /></template>
-                <v-list-item title="Theme" prepend-icon="mdi-theme-light-dark">
-                  <template v-slot:append>
-                    <v-select
-                      v-model="theme"
-                      :items="[
-                        { value: 'light', title: 'Light' },
-                        { value: 'dark', title: 'Dark' },
-                      ]"
-                      density="compact"
-                      hide-details
-                      variant="outlined"
-                      style="width: 150px"
-                    />
-                  </template>
-                </v-list-item>
-              </v-list-group>
-              <v-list-group value="time-display">
-                <template v-slot:activator="{ props }"
-                  ><v-list-item
-                    v-bind="props"
-                    prepend-icon="mdi-clock-outline"
-                    title="Time Display"
-                /></template>
-                <v-list-item title="Time Format" prepend-icon="mdi-clock-time-twelve-outline">
-                  <template v-slot:append>
-                    <v-select
-                      v-model="timeFormat"
-                      :items="[
-                        { value: '24', title: '24-hour' },
-                        { value: '12', title: '12-hour' },
-                      ]"
-                      density="compact"
-                      hide-details
-                      variant="outlined"
-                      style="width: 150px"
-                    />
-                  </template>
-                </v-list-item>
-              </v-list-group>
-              <v-list-group value="reports">
-                <template v-slot:activator="{ props }"
-                  ><v-list-item
-                    v-bind="props"
-                    prepend-icon="mdi-file-document-multiple"
-                    title="Reports"
-                /></template>
-                <v-list-item title="Items per Page" prepend-icon="mdi-view-list">
-                  <template v-slot:append>
-                    <v-select
-                      v-model="itemsPerPage"
-                      :items="[5, 10, 20, 50]"
-                      density="compact"
-                      hide-details
-                      variant="outlined"
-                      style="width: 150px"
-                    />
-                  </template>
-                </v-list-item>
-              </v-list-group>
-            </v-list>
-            <div class="button-group d-flex flex-wrap justify-center align-center mt-6">
-              <v-btn variant="outlined" size="large" @click="currentView = 'dashboard'"
-                ><v-icon start>mdi-arrow-left</v-icon> Back</v-btn
-              >
-            </div>
-          </v-card>
-        </div>
-      </v-container>
-    </v-main>
-    <!-- Mobile Footer -->
-    <v-row v-if="mobile" class="mt-auto mx-0">
-      <v-col cols="12" class="px-0">
-        <div
-          class="footer-mobile-content"
-          :class="theme === 'light' ? 'bg-footer-light' : 'bg-footer-dark'"
-        >
-          <div class="footer-content-mobile text-center py-6">
-            <div class="mb-4">
-              <span class="text-caption font-weight-medium text-white"
-                >&copy; 2025 BCWD Complaint System</span
-              >
-            </div>
-            <div class="footer-contacts-mobile mb-4">
-              <div class="contact-line mb-2">
-                <v-icon size="16" class="mr-2 text-white">mdi-map-marker</v-icon
-                ><span class="text-body-2 text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
-              </div>
-              <div class="contact-line mb-2">
-                <v-icon size="16" class="mr-2 text-white">mdi-phone</v-icon
-                ><span class="text-body-2 text-white">(085) 817-6635</span>
-              </div>
-              <div class="contact-line mb-2">
-                <v-icon size="16" class="mr-2 text-white">mdi-cellphone</v-icon
-                ><span class="text-body-2 text-white">0918-930-4234 • 0917-188-8726</span>
-              </div>
-              <div class="contact-line mb-2">
-                <v-icon size="16" class="mr-2 text-white">mdi-email</v-icon
-                ><span class="text-body-2 text-white">bcwdrecords@gmail.com</span>
-              </div>
-            </div>
-            <div>
-              <small class="text-body-2 font-weight-medium text-white"
-                >Philippines (Asia/Manila)</small
-              >
-            </div>
-          </div>
-        </div>
-      </v-col>
-    </v-row>
-    <!-- Desktop Footer -->
-    <v-footer
-      v-if="!mobile"
-      class="py-6 footer-bar consumer-footer"
-      :color="theme === 'light' ? '#1565c0' : '#0f1720'"
-    >
-      <v-container class="pa-0">
-        <v-row no-gutters align="center" class="footer-content px-2 px-sm-4 justify-space-between">
-          <div class="consumer-footer-depth copyright d-flex align-center mb-4 mb-md-0">
-            <span class="text-body-2 font-weight-medium text-white"
-              >&copy; 2025 BCWD Complaint System</span
-            >
-          </div>
-          <div
-            class="footer-section contacts d-flex flex-column align-center justify-center flex-grow-1 mx-4"
-          >
-            <div class="contact-item d-flex align-center gap-2 mb-2">
-              <v-icon size="16" class="text-white">mdi-map-marker</v-icon
-              ><span class="text-body-2 text-white">Gov. Jose A. Rosales Ave., Butuan City</span>
-            </div>
-            <div class="contact-item d-flex align-center gap-2 mb-2">
-              <v-icon size="16" class="text-white">mdi-phone</v-icon
-              ><span class="text-body-2 text-white">(085) 817-6635</span>
-            </div>
-            <div class="contact-item d-flex align-center gap-2 mb-2">
-              <v-icon size="16" class="text-white">mdi-cellphone</v-icon
-              ><span class="text-body-2 text-white">0918-930-4234 • 0917-188-8726</span>
-            </div>
-            <div class="contact-item d-flex align-center gap-2 mb-2">
-              <v-icon size="16" class="text-white">mdi-email</v-icon
-              ><span class="text-body-2 text-white">bcwdrecords@gmail.com</span>
-            </div>
-          </div>
-          <div class="footer-section timezone d-flex align-center mt-4 mt-md-0">
-            <small class="text-body-2 font-weight-medium text-white"
-              >Philippines (Asia/Manila)</small
-            >
-          </div>
-        </v-row>
-      </v-container>
-    </v-footer>
-    <!-- Report Details Dialog -->
-    <v-dialog v-model="dialog" max-width="820">
-      <v-card v-if="selectedReport" rounded="xl" class="pa-6">
-        <v-card-title class="font-weight-bold mb-4" style="padding: 0;">
-          <v-icon start>mdi-file-document</v-icon>
-          Complaint Details
-        </v-card-title>
-        <div v-if="selectedReport" class="mb-6">
-          <div class="status-badge-large" :style="{ borderColor: statusHexColors[selectedReport.status] }">
-            <div class="status-label-small">STATUS</div>
-            <div class="status-value-large" :style="{ color: statusHexColors[selectedReport.status] }">
-              {{ (selectedReport.status || 'pending').toUpperCase() }}
-            </div>
-          </div>
-        </div>
-        <v-divider class="mb-4" />
-        <v-card-text class="pa-0">
-          <div class="complaint-details-wrapper">
-            <div class="complaint-details-content">
-              <div class="info-row mb-3">
-                <span class="info-label">Type</span>
-                <span class="info-value">{{ selectedReport.type || 'N/A' }}</span>
-              </div>
-              <div class="info-row mb-3">
-                <span class="info-label">Reported by</span>
-                <span class="info-value">{{ userName }}</span>
-              </div>
-              <div class="info-row mb-3">
-                <span class="info-label">Severity</span>
-                <span class="info-value">{{ selectedReport.severity || 'N/A' }}</span>
-              </div>
-              <div class="info-row mb-3">
-                <span class="info-label">Landmark</span>
-                <span class="info-value">{{ selectedReport.landmark || selectedReport.location || 'N/A' }}</span>
-              </div>
-              <div class="info-row mb-3">
-                <span class="info-label">Assigned to</span>
-                <span class="info-value">{{ selectedReport.assigned_personnel || 'N/A' }}</span>
-              </div>
-              <div class="info-row mb-3">
-                <span class="info-label">Coordinates</span>
-                <span class="info-value text-caption">Lat: {{ selectedReport.latitude || 'N/A' }}<br/>Lng: {{ selectedReport.longitude || 'N/A' }}</span>
-              </div>
-              <div class="info-row text-caption mb-4" v-if="selectedReport.notes">
-                <span class="info-label">Notes</span>
-                <span class="info-value">{{ selectedReport.notes }}</span>
-              </div>
-              <v-divider class="my-4" />
-              <h4 class="text-subtitle-2 font-weight-bold mb-3">
-                <v-icon start x-small>mdi-image-multiple</v-icon>
-                Attached Images
-              </h4>
-              <v-row v-if="selectedReport.images && selectedReport.images.length" dense>
-                <v-col v-for="(img, i) in selectedReport.images" :key="i" cols="12" sm="6">
-                  <v-img
-                    :src="img"
-                    height="140"
-                    cover
-                    class="rounded cursor-pointer"
-                    style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);"
-                    @click="openImageViewer(img)"
-                  />
-                </v-col>
-              </v-row>
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions class="dialog-actions pt-4">
-          <v-spacer></v-spacer>
-          <v-btn color="info" variant="outlined" @click="showMapDialog = true">
-            <v-icon start>mdi-map-marker</v-icon> Adjust Map Location
-          </v-btn>
-          <v-btn color="primary" variant="flat" @click="dialog = false">
-            <v-icon start>mdi-close</v-icon>
-            Close
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-    <!-- Image Zoom Dialog -->
-    <v-dialog v-model="showImageViewer" max-width="900" fullscreen>
-      <v-card rounded="xl">
-        <v-card-title class="font-weight-bold d-flex align-center justify-space-between" style="background: linear-gradient(135deg, #1565c0, #1976d2); color: white;">
+    <!-- ─── Main Content ─── -->
+    <v-main :class="['bcwd-main', theme]">
+
+      <!-- ═══ DASHBOARD VIEW ═══ -->
+      <div v-if="currentView === 'dashboard'" class="view-full">
+        <div class="page-hdr">
           <div>
-            <v-icon start>mdi-image</v-icon>
-            Image Viewer
+            <h1 class="page-title">My Complaints</h1>
+            <p class="page-sub">Track and manage your water service reports</p>
           </div>
-          <v-btn icon color="white" @click="showImageViewer = false">
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
-        </v-card-title>
-        <v-card-text
-          class="d-flex justify-center align-center"
-          style="height: calc(100vh - 120px); background: rgba(0, 0, 0, 0.05);"
-          @wheel.prevent="(e) => (e.deltaY < 0 ? zoomIn() : zoomOut())"
-        >
-          <img
-            :src="activeImage"
-            class="zoomable-image"
-            :style="{ transform: `scale(${zoomLevel})`, boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)' }"
-          />
-        </v-card-text>
-        <v-card-actions class="justify-center pa-4" style="background: linear-gradient(135deg, rgba(21, 101, 192, 0.1), rgba(33, 150, 243, 0.08));">
-          <v-btn color="primary" icon @click="zoomOut">
-            <v-icon>mdi-magnify-minus</v-icon>
-          </v-btn>
-          <v-btn color="primary" icon @click="resetZoom">
-            <v-icon>mdi-magnify</v-icon>
-          </v-btn>
-          <v-btn color="primary" icon @click="zoomIn">
-            <v-icon>mdi-magnify-plus</v-icon>
-          </v-btn>
-          <v-spacer />
-          <v-btn color="primary" variant="flat" @click="showImageViewer = false">
-            <v-icon start>mdi-close</v-icon>
-            Close
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-    <!-- Map Adjustment Dialog -->
-    <v-dialog v-model="showMapDialog" max-width="900">
-      <v-card rounded="xl" class="pa-6">
-        <v-card-title class="font-weight-bold mb-4" style="padding: 0;">
-          <v-icon start>mdi-map-marker</v-icon>
-          Adjust Map Location
-        </v-card-title>
-        <v-divider class="mb-4" />
-        <v-card-text class="pa-0">
-          <p class="text-caption text-medium-emphasis mb-4">Click on the map to place or move the pin. Then save.</p>
-          <div id="report-map" style="height: 400px; width: 100%; border: 2px solid rgba(21, 101, 192, 0.2); border-radius: 12px; z-index: 0; position: relative;"></div>
-        </v-card-text>
-        <v-card-actions class="pt-4">
-          <v-spacer />
-          <v-btn color="primary" variant="outlined" @click="showMapDialog = false">
-            <v-icon start>mdi-close</v-icon>
-            Cancel
-          </v-btn>
-          <v-btn color="primary" variant="flat" @click="savePin" :disabled="!markerInstance">
-            <v-icon start>mdi-check</v-icon> Save Location
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-    <!-- Snackbar -->
-    <v-snackbar v-model="snackbar" timeout="2000" location="bottom">
-      <template #default>
-        <div class="d-flex align-center gap-2">
-          <v-icon color="success">mdi-check-circle</v-icon>
-          {{ snackbarMessage }}
+          <div class="page-hdr-actions">
+            <button v-if="notificationCount > 0 && !showUpdatedOnly" class="notif-btn" @click="showUpdatedReports">
+              <v-icon size="20">mdi-bell-ring-outline</v-icon>
+              <span class="notif-badge">{{ notificationCount }}</span>
+            </button>
+            <button class="btn-primary" @click="router.push('/report')">
+              <v-icon size="17" class="mr-1">mdi-plus</v-icon> New Report
+            </button>
+          </div>
         </div>
-      </template>
+
+        <div v-if="showUpdatedOnly" class="update-banner">
+          <v-icon size="18" color="#1d4ed8">mdi-bell-ring</v-icon>
+          <span>Showing <strong>{{ notificationCount }}</strong> updated report{{ notificationCount !== 1 ? 's' : '' }}</span>
+          <button class="btn-ghost" @click="resetToAllReports" style="margin-left:auto;">
+            <v-icon size="15" class="mr-1">mdi-arrow-left</v-icon> All reports
+          </button>
+        </div>
+
+        <div v-if="!showUpdatedOnly" class="filter-row">
+          <button v-for="s in ['all','pending','ongoing','resolved','rejected']" :key="s"
+            :class="['f-chip', `f-chip--${s}`, { 'f-chip--on': currentStatus === s }]"
+            @click="currentStatus = s; page = 1">
+            {{ s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1) }}
+            <span class="f-chip-count">{{ statusCounts[s] }}</span>
+          </button>
+        </div>
+
+        <div v-if="!showUpdatedOnly" class="type-row">
+          <button :class="['t-chip', { 't-chip--on': selectedType === 'all' }]" @click="selectedType = 'all'; page = 1">All types</button>
+          <button v-for="(count, type) in typeCounts" :key="type"
+            :class="['t-chip', { 't-chip--on': selectedType === type }]"
+            @click="selectedType = type; page = 1">
+            <v-icon size="13" class="mr-1">{{ typeIcons[type] }}</v-icon>
+            {{ type.charAt(0).toUpperCase() + type.slice(1) }} ({{ count }})
+          </button>
+        </div>
+
+        <div class="reports-list">
+          <div v-if="paginatedReports.length === 0" class="empty-state">
+            <v-icon size="56" color="#cbd5e1">mdi-inbox-outline</v-icon>
+            <p class="empty-title">No reports found</p>
+            <p class="empty-sub">Try changing your filters or submit a new complaint</p>
+          </div>
+          <div v-for="report in paginatedReports" :key="report.id" :class="['r-card', theme]" @click="openReportDetails(report)">
+            <div :class="['r-icon', `r-icon--${typeColors[(report.type||'other').toLowerCase()]}`]">
+              <v-icon size="22">{{ typeIcons[(report.type||'other').toLowerCase()] }}</v-icon>
+            </div>
+            <div class="r-body">
+              <div class="r-top">
+                <h3 class="r-title">{{ report.type || 'Other' }}</h3>
+                <span :class="['s-pill', `s-pill--${report.status || 'pending'}`]">{{ report.status || 'Pending' }}</span>
+              </div>
+              <div class="r-meta">
+                <span v-if="report.landmark"><v-icon size="12">mdi-map-marker-outline</v-icon> {{ report.landmark }}</span>
+                <span><v-icon size="12">mdi-calendar-outline</v-icon> {{ new Date(report.created_at).toLocaleDateString('en-PH') }}</span>
+              </div>
+              <div v-if="updatedReports.has(report.id)" class="r-updated">
+                <v-icon size="12">mdi-update</v-icon> Status updated
+              </div>
+            </div>
+            <v-icon size="18" color="#cbd5e1">mdi-chevron-right</v-icon>
+          </div>
+        </div>
+
+        <div v-if="paginationLength > 1" class="pagination-row">
+          <v-pagination v-model="page" :length="paginationLength" :total-visible="7" density="compact" color="#1d4ed8" />
+        </div>
+      </div>
+
+      <!-- ═══ PROFILE VIEW ═══ -->
+      <div v-else-if="currentView === 'profile'" class="view-full">
+        <div class="profile-page">
+          <div class="profile-hero">
+            <div class="profile-hero-bg" />
+            <div class="profile-hero-content">
+              <v-avatar :color="avatarColor" size="96" class="profile-hero-av">
+                <span class="av-hero-text">{{ initial }}</span>
+              </v-avatar>
+              <div class="profile-hero-info">
+                <h2 class="profile-hero-name">{{ firstname || userName }} {{ lastname }}</h2>
+                <p class="profile-hero-email">{{ email }}</p>
+                <span class="profile-hero-badge"><v-icon size="13" class="mr-1">mdi-account-check</v-icon> Verified Consumer</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-grid">
+            <div :class="['p-card', theme]">
+              <div class="p-card-header">
+                <div class="p-card-icon" style="background:#eff6ff;"><v-icon size="20" color="#1d4ed8">mdi-account-outline</v-icon></div>
+                <div>
+                  <h3 class="p-card-title">Personal Information</h3>
+                  <p class="p-card-sub">Your name and contact details</p>
+                </div>
+                <button v-if="!editing" class="btn-edit" @click="editing = true">
+                  <v-icon size="15" class="mr-1">mdi-pencil</v-icon> Edit
+                </button>
+              </div>
+              <AlertNotification :form-success-message="formSuccessMessage" :form-error-message="formErrorMessage" />
+              <v-skeleton-loader v-if="loading" type="paragraph" class="mb-2" />
+              <div v-else class="p-fields">
+                <div class="p-field-group">
+                  <v-text-field v-model="firstname" label="First Name" prepend-inner-icon="mdi-account" variant="outlined" density="comfortable" :readonly="!editing" />
+                  <v-text-field v-model="lastname" label="Last Name" prepend-inner-icon="mdi-account" variant="outlined" density="comfortable" :readonly="!editing" />
+                </div>
+                <v-text-field v-model="email" label="Email Address" prepend-inner-icon="mdi-email" variant="outlined" density="comfortable" readonly class="mb-2" />
+                <div class="p-field-group">
+                  <v-text-field v-model="age" label="Age" prepend-inner-icon="mdi-calendar" variant="outlined" density="comfortable" type="number" :readonly="!editing" />
+                  <v-text-field v-model="residency" label="Residency" prepend-inner-icon="mdi-home-city" variant="outlined" density="comfortable" :readonly="!editing" />
+                </div>
+                <div v-if="editing" class="p-actions">
+                  <button class="btn-success" @click="saveProfile" :disabled="saving">
+                    <v-icon size="15" class="mr-1">mdi-content-save</v-icon> {{ saving ? 'Saving…' : 'Save Changes' }}
+                  </button>
+                  <button class="btn-outline" @click="editing = false">Cancel</button>
+                </div>
+              </div>
+            </div>
+
+            <div :class="['p-card', theme]">
+              <div class="p-card-header">
+                <div class="p-card-icon" style="background:#f0fdf4;"><v-icon size="20" color="#16a34a">mdi-lightning-bolt</v-icon></div>
+                <div>
+                  <h3 class="p-card-title">Quick Actions</h3>
+                  <p class="p-card-sub">Shortcuts and account options</p>
+                </div>
+              </div>
+              <div class="quick-actions">
+                <button class="qa-btn" @click="router.push('/report')">
+                  <div class="qa-icon" style="background:#eff6ff;"><v-icon size="22" color="#1d4ed8">mdi-plus-circle</v-icon></div>
+                  <div class="qa-text"><span class="qa-label">File a Complaint</span><span class="qa-sub">Submit a new water service report</span></div>
+                  <v-icon size="16" color="#94a3b8">mdi-chevron-right</v-icon>
+                </button>
+                <button class="qa-btn" @click="currentView = 'dashboard'">
+                  <div class="qa-icon" style="background:#f0fdf4;"><v-icon size="22" color="#16a34a">mdi-view-list</v-icon></div>
+                  <div class="qa-text"><span class="qa-label">View My Reports</span><span class="qa-sub">See all your submitted complaints</span></div>
+                  <v-icon size="16" color="#94a3b8">mdi-chevron-right</v-icon>
+                </button>
+                <button class="qa-btn" @click="currentView = 'settings'">
+                  <div class="qa-icon" style="background:#fef3c7;"><v-icon size="22" color="#d97706">mdi-cog</v-icon></div>
+                  <div class="qa-text"><span class="qa-label">App Settings</span><span class="qa-sub">Theme, time format, preferences</span></div>
+                  <v-icon size="16" color="#94a3b8">mdi-chevron-right</v-icon>
+                </button>
+                <button class="qa-btn qa-btn--danger" @click="logout">
+                  <div class="qa-icon" style="background:#fee2e2;"><v-icon size="22" color="#ef4444">mdi-logout</v-icon></div>
+                  <div class="qa-text"><span class="qa-label" style="color:#ef4444;">Sign Out</span><span class="qa-sub">Logout from your account</span></div>
+                  <v-icon size="16" color="#94a3b8">mdi-chevron-right</v-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SETTINGS VIEW ═══ -->
+      <div v-else-if="currentView === 'settings'" class="view-full">
+        <div class="settings-page">
+          <div class="settings-hero">
+            <div class="settings-hero-icon"><v-icon size="36" color="white">mdi-cog</v-icon></div>
+            <div>
+              <h1 class="settings-hero-title">Settings</h1>
+              <p class="settings-hero-sub">Manage your application preferences</p>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <div :class="['s-card', theme]">
+              <div class="s-card-header">
+                <div class="s-card-icon" style="background:#eff6ff;"><v-icon size="20" color="#1d4ed8">mdi-palette-outline</v-icon></div>
+                <div>
+                  <h3 class="s-card-title">Appearance</h3>
+                  <p class="s-card-sub">Customize how the app looks</p>
+                </div>
+              </div>
+              <div class="s-options">
+                <div class="s-option">
+                  <div class="s-option-info">
+                    <v-icon size="18" color="#64748b">mdi-theme-light-dark</v-icon>
+                    <div>
+                      <p class="s-option-label">Color Theme</p>
+                      <p class="s-option-desc">Switch between light and dark mode</p>
+                    </div>
+                  </div>
+                  <div class="theme-toggle-group">
+                    <button :class="['theme-btn', { 'theme-btn--on': theme === 'light' }]" @click="theme = 'light'">
+                      <v-icon size="16">mdi-white-balance-sunny</v-icon> Light
+                    </button>
+                    <button :class="['theme-btn', { 'theme-btn--on': theme === 'dark' }]" @click="theme = 'dark'">
+                      <v-icon size="16">mdi-weather-night</v-icon> Dark
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div :class="['s-card', theme]">
+              <div class="s-card-header">
+                <div class="s-card-icon" style="background:#f0fdf4;"><v-icon size="20" color="#16a34a">mdi-clock-outline</v-icon></div>
+                <div>
+                  <h3 class="s-card-title">Time Display</h3>
+                  <p class="s-card-sub">Set your preferred time format</p>
+                </div>
+              </div>
+              <div class="s-options">
+                <div class="s-option">
+                  <div class="s-option-info">
+                    <v-icon size="18" color="#64748b">mdi-clock-time-twelve-outline</v-icon>
+                    <div>
+                      <p class="s-option-label">Time Format</p>
+                      <p class="s-option-desc">Choose 12-hour or 24-hour clock</p>
+                    </div>
+                  </div>
+                  <div class="theme-toggle-group">
+                    <button :class="['theme-btn', { 'theme-btn--on': timeFormat === '24' }]" @click="timeFormat = '24'">24h</button>
+                    <button :class="['theme-btn', { 'theme-btn--on': timeFormat === '12' }]" @click="timeFormat = '12'">12h</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div :class="['s-card', theme]">
+              <div class="s-card-header">
+                <div class="s-card-icon" style="background:#fef3c7;"><v-icon size="20" color="#d97706">mdi-file-document-multiple-outline</v-icon></div>
+                <div>
+                  <h3 class="s-card-title">Reports Display</h3>
+                  <p class="s-card-sub">Control how many records appear</p>
+                </div>
+              </div>
+              <div class="s-options">
+                <div class="s-option">
+                  <div class="s-option-info">
+                    <v-icon size="18" color="#64748b">mdi-view-list</v-icon>
+                    <div>
+                      <p class="s-option-label">Items per Page</p>
+                      <p class="s-option-desc">Reports shown per page</p>
+                    </div>
+                  </div>
+                  <div class="items-select-group">
+                    <button v-for="n in [5,10,20,50]" :key="n"
+                      :class="['items-btn', { 'items-btn--on': itemsPerPage === n }]"
+                      @click="itemsPerPage = n">{{ n }}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div :class="['s-card', theme]">
+              <div class="s-card-header">
+                <div class="s-card-icon" style="background:#f5f3ff;"><v-icon size="20" color="#7c3aed">mdi-information-outline</v-icon></div>
+                <div>
+                  <h3 class="s-card-title">About</h3>
+                  <p class="s-card-sub">System and contact information</p>
+                </div>
+              </div>
+              <div class="about-info">
+                <div class="about-row"><span class="about-lbl">System</span><span class="about-val">BCWD Complaint System</span></div>
+                <div class="about-row"><span class="about-lbl">Version</span><span class="about-val">2025.1</span></div>
+                <div class="about-row"><span class="about-lbl">Hotline</span><span class="about-val">(085) 817-6635</span></div>
+                <div class="about-row"><span class="about-lbl">Email</span><span class="about-val">bcwdrecords@gmail.com</span></div>
+                <div class="about-row"><span class="about-lbl">Address</span><span class="about-val">Gov. Jose A. Rosales Ave., Butuan City</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Footer ─── -->
+      <footer class="bcwd-footer">
+        <div class="footer-row">
+          <span>© 2025 BCWD Complaint System</span>
+          <div class="footer-contacts d-none d-md-flex">
+            <span><v-icon size="13">mdi-map-marker</v-icon> Gov. Jose A. Rosales Ave., Butuan City</span>
+            <span><v-icon size="13">mdi-phone</v-icon> (085) 817-6635</span>
+            <span><v-icon size="13">mdi-cellphone</v-icon> 0918-930-4234 · 0917-188-8726</span>
+            <span><v-icon size="13">mdi-email</v-icon> bcwdrecords@gmail.com</span>
+          </div>
+          <span>Philippines (Asia/Manila)</span>
+        </div>
+      </footer>
+    </v-main>
+
+    <!-- ─── Dialogs unchanged ─── -->
+    <v-dialog v-model="dialog" max-width="700">
+      <div :class="['bcwd-dialog', theme]">
+        <div class="dialog-bar">
+          <div class="dialog-bar-left"><v-icon size="19" color="white">mdi-file-document-outline</v-icon><h3>Complaint Details</h3></div>
+          <button class="dialog-x" @click="dialog = false"><v-icon size="19" color="white">mdi-close</v-icon></button>
+        </div>
+        <div class="dialog-body" v-if="selectedReport">
+          <div :class="['status-hero', `status-hero--${selectedReport.status || 'pending'}`]">
+            <span class="status-hero-lbl">STATUS</span>
+            <span class="status-hero-val">{{ (selectedReport.status || 'PENDING').toUpperCase() }}</span>
+          </div>
+          <div class="detail-grid">
+            <div class="d-item" v-for="it in [
+              { l:'Type', v: selectedReport.type || 'N/A', i:'mdi-format-list-bulleted' },
+              { l:'Reported by', v: userName, i:'mdi-account' },
+              { l:'Severity', v: selectedReport.severity || 'N/A', i:'mdi-alert' },
+              { l:'Landmark', v: selectedReport.landmark || selectedReport.location || 'N/A', i:'mdi-map-marker' },
+              { l:'Assigned to', v: selectedReport.assigned_personnel || 'Not yet assigned', i:'mdi-account-hard-hat' },
+              { l:'Coordinates', v: selectedReport.latitude ? `${Number(selectedReport.latitude).toFixed(5)}, ${Number(selectedReport.longitude).toFixed(5)}` : 'N/A', i:'mdi-crosshairs-gps' },
+            ]" :key="it.l">
+              <div class="d-item-lbl"><v-icon size="13">{{ it.i }}</v-icon> {{ it.l }}</div>
+              <div class="d-item-val">{{ it.v }}</div>
+            </div>
+            <div v-if="selectedReport.notes" class="d-item d-item--full">
+              <div class="d-item-lbl"><v-icon size="13">mdi-note-text</v-icon> Notes</div>
+              <div class="d-item-val">{{ selectedReport.notes }}</div>
+            </div>
+          </div>
+          <div v-if="selectedReport.images && selectedReport.images.length" class="dialog-imgs">
+            <p class="imgs-lbl"><v-icon size="13">mdi-image-multiple</v-icon> Attached Photos</p>
+            <div class="imgs-grid">
+              <img v-for="(img, i) in selectedReport.images" :key="i" :src="img" class="thumb" @click="openImageViewer(img)" />
+            </div>
+          </div>
+        </div>
+        <div class="dialog-foot">
+          <button class="btn-outline" @click="showMapDialog = true"><v-icon size="15" class="mr-1">mdi-map-marker</v-icon> Adjust Location</button>
+          <button class="btn-primary" @click="dialog = false"><v-icon size="15" class="mr-1">mdi-close</v-icon> Close</button>
+        </div>
+      </div>
+    </v-dialog>
+
+    <v-dialog v-model="showImageViewer" fullscreen>
+      <div :class="['img-viewer', theme]">
+        <div class="img-viewer-bar">
+          <span>Image Viewer</span>
+          <div class="d-flex gap-2">
+            <button class="viewer-btn" @click="zoomOut"><v-icon>mdi-magnify-minus</v-icon></button>
+            <button class="viewer-btn" @click="resetZoom"><v-icon>mdi-magnify</v-icon></button>
+            <button class="viewer-btn" @click="zoomIn"><v-icon>mdi-magnify-plus</v-icon></button>
+            <button class="viewer-btn viewer-btn--red" @click="showImageViewer = false"><v-icon>mdi-close</v-icon></button>
+          </div>
+        </div>
+        <div class="img-viewer-body" @wheel.prevent="e => e.deltaY < 0 ? zoomIn() : zoomOut()">
+          <img :src="activeImage" :style="{ transform: `scale(${zoomLevel})` }" class="viewer-img" />
+        </div>
+      </div>
+    </v-dialog>
+
+    <v-dialog v-model="showMapDialog" max-width="800">
+      <div :class="['bcwd-dialog', theme]">
+        <div class="dialog-bar">
+          <div class="dialog-bar-left"><v-icon size="19" color="white">mdi-map-marker</v-icon><h3>Adjust Map Location</h3></div>
+          <button class="dialog-x" @click="showMapDialog = false"><v-icon size="19" color="white">mdi-close</v-icon></button>
+        </div>
+        <div class="dialog-body">
+          <p style="font-size:13px;color:#64748b;margin:0 0 12px;">Click on the map to place or move the pin, then save.</p>
+          <div id="report-map" style="height:400px;width:100%;border-radius:12px;border:1px solid #e2e8f0;position:relative;z-index:0;" />
+        </div>
+        <div class="dialog-foot">
+          <button class="btn-outline" @click="showMapDialog = false">Cancel</button>
+          <button class="btn-primary" @click="savePin" :disabled="!markerInstance"><v-icon size="15" class="mr-1">mdi-check</v-icon> Save Location</button>
+        </div>
+      </div>
+    </v-dialog>
+
+    <v-snackbar v-model="snackbar" timeout="2500" location="bottom right" color="#1d4ed8">
+      <div class="d-flex align-center gap-2"><v-icon size="18">mdi-check-circle</v-icon> {{ snackbarMessage }}</div>
     </v-snackbar>
   </v-app>
 </template>
+
 <style scoped>
-/* Your original styles (unchanged) */
-.ph-time {
-  opacity: 0.9;
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+* { font-family: 'Plus Jakarta Sans', sans-serif; box-sizing: border-box; }
+
+/* ── Theme vars ── */
+.bcwd-app.light { --bg: #f0f6ff; --surface: #ffffff; --surface2: #f8fafc; --border: #e2e8f0; --text: #0f172a; --text2: #334155; --muted: #64748b; }
+.bcwd-app.dark  { --bg: #060e1a; --surface: #0f1e35; --surface2: #0c1828; --border: rgba(255,255,255,0.09); --text: #f1f5f9; --text2: #cbd5e1; --muted: #94a3b8; }
+
+/* ── Header — WHITE (matches RegisterView) ── */
+.bcwd-header { background: #ffffff !important; border-bottom: 1px solid #e2e8f0 !important; box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important; }
+.bcwd-header.dark { background: #0c1624 !important; border-bottom-color: rgba(255,255,255,0.08) !important; }
+.header-inner { display: flex; align-items: center; width: 100%; padding: 0 20px; gap: 14px; }
+.menu-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #e2e8f0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+.menu-btn:hover { background: #f1f5f9; }
+.bcwd-header.dark .menu-btn { border-color: rgba(255,255,255,0.12); }
+.header-brand { display: flex; align-items: center; gap: 10px; }
+.header-img { border-radius: 6px; flex-shrink: 0; }
+.header-title { font-size: 15px; font-weight: 700; color: #1e40af; letter-spacing: -0.3px; }
+.bcwd-header.dark .header-title { color: #60a5fa; }
+.header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.header-time { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; }
+.bcwd-header.dark .header-time { color: #94a3b8; }
+
+/* ── Sidebar — LIGHT BLUE ── */
+.bcwd-sidebar { background: #1d4ed8 !important; border-right: none !important; box-shadow: 2px 0 16px rgba(29,78,216,0.25) !important; }
+.bcwd-app.dark .bcwd-sidebar { background: #0f2560 !important; }
+
+.sidebar-profile { display: flex; align-items: center; gap: 12px; padding: 20px 16px 14px; }
+.sidebar-profile--rail { justify-content: center; padding: 18px 0; }
+.profile-av { flex-shrink: 0; border: 2px solid rgba(255,255,255,0.35) !important; }
+.av-text { font-size: 20px; font-weight: 700; color: white; }
+.profile-meta { overflow: hidden; }
+.profile-name { font-size: 14px; font-weight: 700; color: #ffffff; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-role { font-size: 11px; color: rgba(255,255,255,0.65); margin: 2px 0 0; font-weight: 500; }
+
+.sidebar-sep { height: 1px; background: rgba(255,255,255,0.18); margin: 0 14px 10px; }
+
+.sidebar-nav { display: flex; flex-direction: column; padding: 0 10px; gap: 3px; }
+.s-nav-item { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 10px; border: none; background: transparent; color: rgba(255,255,255,0.75); cursor: pointer; font-size: 14px; font-weight: 500; width: 100%; text-align: left; transition: all 0.18s; font-family: 'Plus Jakarta Sans', sans-serif; position: relative; }
+.s-nav-item:hover { background: rgba(255,255,255,0.15); color: #ffffff; }
+.s-nav-item--active { background: rgba(255,255,255,0.2) !important; color: #ffffff !important; font-weight: 700 !important; box-shadow: inset 3px 0 0 #ffffff; }
+.s-nav-label { flex: 1; }
+.s-nav-badge { background: #ef4444; color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 10px; }
+.s-nav-item--logout { margin-top: 20px; color: rgba(255,200,200,0.85) !important; }
+.s-nav-item--logout:hover { background: rgba(239,68,68,0.25) !important; color: #fca5a5 !important; }
+
+/* ── Rail toggle ── */
+.rail-lump {
+  position: absolute; top: 50%; right: -16px; transform: translateY(-50%);
+  width: 32px; height: 64px; border-radius: 0 14px 14px 0;
+  background: #1d4ed8; border: 1px solid rgba(255,255,255,0.2); border-left: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 3px 0 10px rgba(29,78,216,0.3);
+  transition: all 0.2s; z-index: 10;
 }
-.v-navigation-drawer {
-  border-right: none !important;
-}
-.v-list-item--active {
-  background-color: rgba(255, 255, 255, 0.12) !important;
-}
-.bg-footer-light {
-  background-color: #1565c0;
-}
-.bg-footer-dark {
-  background-color: #0f1720;
-}
-.text-white {
-  color: white !important;
-}
-.footer-content-mobile {
-  color: white;
-}
-.footer-contacts-mobile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.contact-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.zoomable-image {
-  max-width: 100%;
-  max-height: 70vh;
-  transition: transform 0.2s ease;
-}
-.cursor-pointer {
-  cursor: pointer;
-}
-.sidebar-profile {
-  padding: 28px 16px 20px !important;
-  transition: all 0.3s ease;
-}
-.profile-avatar {
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.25s ease;
-}
-.profile-avatar:hover {
-  transform: scale(1.06);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
-}
-.admin-info {
-  line-height: 1.3;
-}
-.admin-name {
-  color: rgba(255, 255, 255, 0.96);
-  letter-spacing: 0.3px;
-}
-.admin-role {
-  color: rgba(255, 255, 255, 0.62);
-  margin-top: 3px;
-}
-.v-navigation-drawer--rail .sidebar-profile {
-  display: none !important;
-}
-.modern-card {
-  transition: all 0.3s ease;
-}
-.modern-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-}
-.button-group {
-  gap: 12px;
-  width: 100%;
-}
-.flex-btn {
-  flex: 1 1 200px;
-  max-width: 240px;
-  justify-content: center;
+.bcwd-app.dark .rail-lump { background: #0f2560; }
+.rail-lump:hover { background: #1e40af; }
+
+/* ── Main ── */
+.bcwd-main { background: var(--bg) !important; display: flex; flex-direction: column; }
+.view-full { flex: 1; padding: 28px 32px 0; width: 100%; max-width: 100%; }
+
+/* ── Page header ── */
+.page-hdr { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; gap: 16px; flex-wrap: wrap; }
+.page-title { font-size: 26px; font-weight: 800; color: var(--text); margin: 0 0 4px; letter-spacing: -0.5px; }
+.page-sub { font-size: 14px; color: var(--muted); margin: 0; }
+.page-hdr-actions { display: flex; align-items: center; gap: 12px; }
+
+/* ── Buttons ── */
+.btn-primary { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; border: none; border-radius: 10px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; transition: all 0.2s; box-shadow: 0 4px 12px rgba(29,78,216,0.3); font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(29,78,216,0.4); }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+.btn-outline { background: transparent; color: #1d4ed8; border: 1.5px solid #1d4ed8; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-outline:hover { background: rgba(29,78,216,0.06); }
+.bcwd-app.dark .btn-outline { color: #60a5fa; border-color: #60a5fa; }
+.btn-success { background: linear-gradient(135deg, #059669, #10b981); color: white; border: none; border-radius: 10px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-ghost { background: transparent; color: #1d4ed8; border: none; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; border-radius: 8px; transition: 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.btn-ghost:hover { background: rgba(29,78,216,0.08); }
+.btn-edit { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; font-family: 'Plus Jakarta Sans', sans-serif; transition: 0.2s; }
+.btn-edit:hover { background: #dbeafe; }
+
+/* ── Notif button ── */
+.notif-btn { position: relative; width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid #e2e8f0; background: var(--surface); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted); transition: 0.2s; }
+.notif-btn:hover { border-color: #1d4ed8; color: #1d4ed8; }
+.notif-badge { position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; font-size: 10px; font-weight: 800; padding: 2px 5px; border-radius: 8px; min-width: 18px; text-align: center; }
+
+/* ── Update banner ── */
+.update-banner { display: flex; align-items: center; gap: 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 14px; color: #1e40af; }
+.bcwd-app.dark .update-banner { background: rgba(29,78,216,0.1); border-color: rgba(59,130,246,0.25); color: #93c5fd; }
+
+/* ── Filter rows ── */
+.filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.f-chip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 50px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.f-chip:hover { border-color: #1d4ed8; color: #1d4ed8; }
+.f-chip-count { font-size: 11px; font-weight: 800; background: var(--surface2); padding: 1px 7px; border-radius: 10px; }
+.f-chip--on.f-chip--all      { background: #1d4ed8; border-color: #1d4ed8; color: white; }
+.f-chip--on.f-chip--pending  { background: #f59e0b; border-color: #f59e0b; color: white; }
+.f-chip--on.f-chip--ongoing  { background: #3b82f6; border-color: #3b82f6; color: white; }
+.f-chip--on.f-chip--resolved { background: #22c55e; border-color: #22c55e; color: white; }
+.f-chip--on.f-chip--rejected { background: #ef4444; border-color: #ef4444; color: white; }
+.f-chip--on .f-chip-count { background: rgba(255,255,255,0.22); color: white; }
+.type-row { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 18px; }
+.t-chip { display: inline-flex; align-items: center; padding: 5px 13px; border-radius: 50px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.t-chip:hover { border-color: #1d4ed8; color: #1d4ed8; }
+.t-chip--on { background: #eff6ff; border-color: #1d4ed8; color: #1d4ed8; font-weight: 700; }
+.bcwd-app.dark .t-chip--on { background: rgba(29,78,216,0.14); border-color: #60a5fa; color: #60a5fa; }
+
+/* ── Reports list ── */
+.reports-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.r-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; }
+.r-card:hover { border-color: #1d4ed8; box-shadow: 0 4px 16px rgba(29,78,216,0.1); transform: translateX(2px); }
+.r-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.r-icon--red    { background: #fef2f2; color: #ef4444; }
+.r-icon--orange { background: #fff7ed; color: #f97316; }
+.r-icon--grey   { background: #f8fafc; color: #94a3b8; }
+.bcwd-app.dark .r-icon--red    { background: rgba(239,68,68,0.12); }
+.bcwd-app.dark .r-icon--orange { background: rgba(249,115,22,0.12); }
+.bcwd-app.dark .r-icon--grey   { background: rgba(148,163,184,0.12); }
+.r-body { flex: 1; min-width: 0; }
+.r-top { display: flex; align-items: center; gap: 12px; margin-bottom: 5px; }
+.r-title { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; }
+.r-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.r-meta span { display: flex; align-items: center; gap: 4px; }
+.r-updated { font-size: 11px; color: #22c55e; font-weight: 600; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+
+/* ── Status pills ── */
+.s-pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.s-pill--pending  { background: #fef3c7; color: #92400e; }
+.s-pill--ongoing  { background: #dbeafe; color: #1e40af; }
+.s-pill--resolved { background: #dcfce7; color: #166534; }
+.s-pill--rejected { background: #fee2e2; color: #991b1b; }
+.bcwd-app.dark .s-pill--pending  { background: rgba(245,158,11,0.18); color: #fbbf24; }
+.bcwd-app.dark .s-pill--ongoing  { background: rgba(59,130,246,0.18); color: #60a5fa; }
+.bcwd-app.dark .s-pill--resolved { background: rgba(34,197,94,0.18);  color: #4ade80; }
+.bcwd-app.dark .s-pill--rejected { background: rgba(239,68,68,0.18);  color: #f87171; }
+
+.pagination-row { display: flex; justify-content: center; padding: 8px 0 24px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; padding: 60px 24px; color: var(--muted); gap: 6px; }
+.empty-title { font-size: 18px; font-weight: 700; color: var(--text); margin: 8px 0 0; }
+.empty-sub { font-size: 14px; color: var(--muted); margin: 0; }
+
+/* ═══ PROFILE PAGE ═══ */
+.profile-page { max-width: 100%; }
+.profile-hero { position: relative; border-radius: 18px; overflow: hidden; margin-bottom: 24px; }
+.profile-hero-bg { position: absolute; inset: 0; background: linear-gradient(135deg, #1d4ed8, #2563eb, #7c3aed); }
+.profile-hero-bg::after { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px); background-size: 24px 24px; }
+.profile-hero-content { position: relative; z-index: 1; display: flex; align-items: center; gap: 24px; padding: 36px 32px; flex-wrap: wrap; }
+.profile-hero-av { border: 4px solid rgba(255,255,255,0.35) !important; flex-shrink: 0; }
+.av-hero-text { font-size: 36px; font-weight: 800; color: white; }
+.profile-hero-info { flex: 1; }
+.profile-hero-name { font-size: 24px; font-weight: 800; color: #fff; margin: 0 0 4px; letter-spacing: -0.4px; }
+.profile-hero-email { font-size: 14px; color: rgba(255,255,255,0.75); margin: 0 0 10px; }
+.profile-hero-badge { display: inline-flex; align-items: center; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); color: white; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.p-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+.p-card-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px; }
+.p-card-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.p-card-title { font-size: 15px; font-weight: 700; color: var(--text); margin: 0 0 2px; }
+.p-card-sub { font-size: 12px; color: var(--muted); margin: 0; }
+.p-fields { display: flex; flex-direction: column; gap: 2px; }
+.p-field-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.p-actions { display: flex; gap: 10px; margin-top: 12px; }
+
+.quick-actions { display: flex; flex-direction: column; gap: 4px; }
+.qa-btn { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; text-align: left; width: 100%; }
+.qa-btn:hover { border-color: #1d4ed8; background: #eff6ff; transform: translateX(2px); }
+.bcwd-app.dark .qa-btn:hover { border-color: rgba(59,130,246,0.4); background: rgba(29,78,216,0.1); }
+.qa-icon { width: 44px; height: 44px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.qa-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.qa-label { font-size: 14px; font-weight: 600; color: var(--text); }
+.qa-sub { font-size: 12px; color: var(--muted); }
+
+/* ═══ SETTINGS PAGE ═══ */
+.settings-page { max-width: 100%; }
+.settings-hero { display: flex; align-items: center; gap: 20px; background: linear-gradient(135deg, #1d4ed8, #2563eb); border-radius: 16px; padding: 28px 32px; margin-bottom: 24px; }
+.settings-hero-icon { width: 64px; height: 64px; background: rgba(255,255,255,0.18); border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25); }
+.settings-hero-title { font-size: 24px; font-weight: 800; color: white; margin: 0 0 4px; letter-spacing: -0.4px; }
+.settings-hero-sub { font-size: 14px; color: rgba(255,255,255,0.75); margin: 0; }
+
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.s-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+.s-card-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+.s-card-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.s-card-title { font-size: 14px; font-weight: 700; color: var(--text); margin: 0 0 2px; }
+.s-card-sub { font-size: 12px; color: var(--muted); margin: 0; }
+.s-options { display: flex; flex-direction: column; gap: 12px; }
+.s-option { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.s-option-info { display: flex; align-items: center; gap: 12px; }
+.s-option-label { font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 2px; }
+.s-option-desc { font-size: 12px; color: var(--muted); margin: 0; }
+
+.theme-toggle-group { display: flex; border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; }
+.theme-btn { padding: 7px 14px; border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: 0.18s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.theme-btn--on { background: #1d4ed8; color: white; }
+.theme-btn--on:hover { background: #1e40af; }
+
+.items-select-group { display: flex; border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; }
+.items-btn { padding: 7px 14px; border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.18s; font-family: 'Plus Jakarta Sans', sans-serif; }
+.items-btn--on { background: #1d4ed8; color: white; }
+
+.about-info { display: flex; flex-direction: column; gap: 10px; }
+.about-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 14px; background: var(--surface2); border-radius: 10px; border: 1px solid var(--border); gap: 12px; }
+.about-lbl { font-size: 12px; font-weight: 600; color: var(--muted); min-width: 70px; }
+.about-val { font-size: 13px; font-weight: 600; color: var(--text); text-align: right; flex: 1; }
+
+/* ── Footer ── */
+.bcwd-footer { background: #1e3a8a; color: white; padding: 10px 0; font-size: 12px; margin-top: auto; }
+.footer-row { max-width: 100%; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.footer-contacts { display: flex; gap: 16px; opacity: 0.8; }
+.footer-contacts span { display: flex; align-items: center; gap: 5px; }
+
+/* ═══ DIALOGS ═══ */
+/* Force Vuetify's own dialog card to be opaque */
+:deep(.v-dialog > .v-overlay__content > *) { background: #ffffff !important; border-radius: 20px !important; }
+:deep(.v-dialog .v-card) { background: #ffffff !important; }
+.bcwd-app.dark :deep(.v-dialog > .v-overlay__content > *) { background: #0f1e35 !important; }
+.bcwd-app.dark :deep(.v-dialog .v-card) { background: #0f1e35 !important; }
+
+.bcwd-dialog { background: #ffffff !important; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.22); }
+.bcwd-app.dark .bcwd-dialog { background: #0f1e35 !important; }
+.dialog-bar { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+.dialog-bar-left { display: flex; align-items: center; gap: 10px; }
+.dialog-bar-left h3 { font-size: 15px; font-weight: 700; color: white; margin: 0; }
+.dialog-x { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.dialog-x:hover { background: rgba(255,255,255,0.2); }
+.dialog-body { padding: 22px; background: #ffffff !important; }
+.bcwd-app.dark .dialog-body { background: #0f1e35 !important; }
+.dialog-foot { padding: 14px 22px; background: #f8fafc !important; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; }
+.bcwd-app.dark .dialog-foot { background: #0c1828 !important; border-top-color: rgba(255,255,255,0.09); }
+
+.status-hero { display: flex; flex-direction: column; align-items: center; padding: 20px; border-radius: 14px; margin-bottom: 18px; border: 2px solid; }
+.status-hero--pending  { background: #fef3c7; border-color: #f59e0b; }
+.status-hero--ongoing  { background: #dbeafe; border-color: #3b82f6; }
+.status-hero--resolved { background: #dcfce7; border-color: #22c55e; }
+.status-hero--rejected { background: #fee2e2; border-color: #ef4444; }
+.bcwd-app.dark .status-hero--pending  { background: rgba(245,158,11,0.1); }
+.bcwd-app.dark .status-hero--ongoing  { background: rgba(59,130,246,0.1); }
+.bcwd-app.dark .status-hero--resolved { background: rgba(34,197,94,0.1); }
+.bcwd-app.dark .status-hero--rejected { background: rgba(239,68,68,0.1); }
+.status-hero-lbl { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; opacity: 0.55; margin-bottom: 4px; color: #0f172a; }
+.status-hero-val { font-size: 26px; font-weight: 800; letter-spacing: 1px; }
+.status-hero--pending  .status-hero-val { color: #92400e; }
+.status-hero--ongoing  .status-hero-val { color: #1e40af; }
+.status-hero--resolved .status-hero-val { color: #166534; }
+.status-hero--rejected .status-hero-val { color: #991b1b; }
+
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.d-item { background: #f0f6ff !important; border-radius: 10px; padding: 11px 13px; border: 1px solid #bfdbfe; }
+.bcwd-app.dark .d-item { background: #0c1828 !important; border-color: rgba(255,255,255,0.09); }
+.d-item--full { grid-column: 1 / -1; }
+.d-item-lbl { font-size: 10px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+.bcwd-app.dark .d-item-lbl { color: #60a5fa; }
+.d-item-val { font-size: 14px; font-weight: 600; color: #0f172a; }
+.bcwd-app.dark .d-item-val { color: #f1f5f9; }
+
+.dialog-imgs { margin-top: 8px; }
+.imgs-lbl { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 10px; display: flex; align-items: center; gap: 5px; }
+.imgs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.thumb { width: 100%; height: 110px; object-fit: cover; border-radius: 10px; cursor: pointer; transition: 0.2s; border: 1px solid var(--border); }
+.thumb:hover { transform: scale(1.04); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+
+/* ── Image Viewer ── */
+.img-viewer { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+.img-viewer.light { background: #f8fafc; }
+.img-viewer.dark  { background: #060e1a; }
+.img-viewer-bar { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; padding: 14px 22px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; }
+.viewer-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; transition: 0.2s; }
+.viewer-btn:hover { background: rgba(255,255,255,0.2); }
+.viewer-btn--red { background: rgba(239,68,68,0.3); border-color: rgba(239,68,68,0.4); }
+.img-viewer-body { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.viewer-img { max-width: 100%; max-height: 80vh; object-fit: contain; transition: transform 0.2s ease; }
+
+/* ── V-field overrides ── */
+:deep(.v-field) { border-radius: 10px !important; }
+:deep(.v-navigation-drawer__scrim) { display: none; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .profile-grid { grid-template-columns: 1fr; }
+  .settings-grid { grid-template-columns: 1fr; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .view-full { padding: 20px 16px 0; }
+  .footer-row { padding: 0 16px; }
+  .p-field-group { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
-  .flex-btn {
-    flex: 1 1 100%;
-    max-width: 100%;
-  }
-  .toolbar-title {
-    font-size: 1rem !important;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    line-height: 1.2;
-    max-width: 50vw;
-  }
-  .v-app-bar {
-    padding-left: 8px !important;
-    padding-right: 8px !important;
-  }
-  .v-container {
-    max-width: 100% !important;
-  }
-}
-/* Sidebar lump */
-.sidebar-lump {
-  position: absolute;
-  top: 50%;
-  right: -32px;
-  transform: translateY(-50%);
-  width: 32px;
-  height: 72px;
-  border-radius: 0 36px 36px 0;
-  background-color: #1565c0;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 50;
-  box-shadow: 3px 0 12px rgba(0, 0, 0, 0.35);
-  transition: all 0.2s ease;
-}
-.v-theme--dark .sidebar-lump {
-  background-color: #0f1720;
-}
-.sidebar-lump:hover {
-  background-color: #1976d2;
-  transform: translateY(-50%) scale(1.08);
-}
-.v-theme--dark .sidebar-lump:hover {
-  background-color: #1e293b;
-}
-.v-navigation-drawer--rail .sidebar-lump {
-  right: -32px;
-}
-.footer-mobile-content {
-  width: 100%;
-}
-
-.dashboard-app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.dashboard-app > .v-main {
-  flex: 1;
-}
-
-  .v-application .v-main__wrap {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-
-  .v-main {
-    flex: 1;
-    min-height: calc(100vh - 64px) !important;
-  }
-
-  .dashboard-main {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-  }
-
-.consumer-header {
-  position: relative;
-  padding: 0 !important;
-  overflow: hidden;
-  z-index: 30;
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.25),
-    0 6px 18px rgba(0, 0, 0, 0.18);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-.consumer-header-depth {
-  position: absolute;
-  inset: 0;
-  width: 100vw;
-  left: 50%;
-  transform: translateX(-50%);
-  pointer-events: none;
-  z-index: 0;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.14),
-    rgba(255, 255, 255, 0.05),
-    rgba(0, 0, 0, 0.22)
-  );
-}
-.consumer-header-inner {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-.consumer-header-title {
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
-  letter-spacing: 0.4px;
-}
-.consumer-header-right {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-.v-theme--dark .consumer-header {
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.55),
-    0 10px 28px rgba(0, 0, 0, 0.65);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-/* Mobile fixes */
-@media (max-width: 600px) {
-  .consumer-header-inner {
-    padding-left: 10px !important;
-    padding-right: 10px !important;
-  }
-  .consumer-header-title {
-    font-size: 0.95rem !important;
-    font-weight: 600 !important;
-    line-height: 1.2;
-    white-space: normal !important;
-    overflow: visible !important;
-    text-overflow: unset !important;
-    max-width: 100% !important;
-    text-align: left;
-  }
-  .v-toolbar-title {
-    white-space: normal !important;
-    overflow: visible !important;
-    text-overflow: unset !important;
-    max-width: 100% !important;
-  }
-  .v-card-title {
-    padding: 12px 14px !important;
-    flex-direction: column;
-    align-items: flex-start !important;
-    gap: 10px;
-  }
-  .v-card-title .text-h6 {
-    font-size: 1rem !important;
-  }
-  .v-card-title > div:last-child {
-    width: 100%;
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .v-card-title .v-btn[icon] {
-    width: 40px !important;
-    height: 40px !important;
-    min-width: 40px !important;
-  }
-  .v-card-title .v-btn[color='primary'] {
-    flex: 1;
-    font-size: 0.75rem !important;
-    height: 40px !important;
-    min-height: 40px !important;
-    padding: 0 12px !important;
-  }
-  .v-btn--size-large {
-    font-size: 0.75rem !important;
-    height: 40px !important;
-    min-height: 40px !important;
-  }
-  .v-chip {
-    font-size: 0.65rem !important;
-    height: 28px !important;
-    padding: 0 8px !important;
-  }
-  .v-pagination {
-    transform: scale(0.9);
-  }
-  .v-list-item {
-    padding: 10px !important;
-  }
-  .v-list-item-title {
-    font-size: 0.85rem !important;
-  }
-  .v-list-item-subtitle {
-    font-size: 0.7rem !important;
-  }
-  .v-list-item .v-icon {
-    font-size: 32px !important;
-  }
-  .v-chip[size='small'] {
-    font-size: 0.6rem !important;
-    height: 22px !important;
-  }
-}
-/* Add this to ensure actions are on top */
-.dialog-actions {
-  z-index: 10;
-  position: relative;
-}
-/* Report Status Chip Styling */
-.report-status-chip {
-  min-width: 120px !important;
-  padding: 8px 16px !important;
-  font-size: 1.1rem !important;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
-  transition: all 0.3s ease;
-}
-.report-status-chip:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
-  transform: scale(1.05);
-}
-/* Complaint Status Chip Styling */
-.complaint-status-chip {
-  min-width: 150px !important;
-  padding: 12px 24px !important;
-  font-size: 1.3rem !important;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
-  transition: all 0.3s ease;
-}
-.complaint-status-chip:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
-  transform: scale(1.08);
-}
-/* Status Text Label (no button styling) */
-.status-label-container {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: inline-block;
-}
-.status-text-label {
-  font-size: 1.2rem;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
-.complaint-details-wrapper {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-}
-.complaint-details-wrapper .status-text-label {
-  position: absolute;
-  top: -8px;
-  right: 0;
-  font-size: 1.1rem;
-  font-weight: bold;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  opacity: 0.9;
-}
-.complaint-details-content {
-  width: 100%;
-}
-.v-card-text {
-  position: relative;
-}
-
-/* ============================= */
-/* MODERN UI ENHANCEMENTS */
-/* ============================= */
-
-/* Cards */
-.v-card {
-  border-radius: 12px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
-  transition: all 0.3s ease;
-}
-
-.v-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
-}
-
-.v-card.modern-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85)) !important;
-  border: 1px solid rgba(21, 101, 192, 0.1);
-}
-
-.v-theme--dark .v-card.modern-card {
-  background: linear-gradient(135deg, rgba(30, 30, 30, 0.9), rgba(35, 35, 35, 0.85)) !important;
-  border: 1px solid rgba(33, 150, 243, 0.15);
-}
-
-/* Chips */
-.v-chip {
-  font-weight: 600 !important;
-  letter-spacing: 0.3px;
-  border-radius: 8px !important;
-  transition: all 0.3s ease;
-}
-
-.v-chip-group .v-chip:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.v-chip-group .v-chip.v-chip--selected {
-  transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-}
-
-/* Buttons */
-.v-btn {
-  border-radius: 8px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.3px !important;
-  text-transform: capitalize !important;
-  transition: all 0.3s ease !important;
-}
-
-.v-btn--flat {
-  background: linear-gradient(135deg, #1565c0, #1976d2) !important;
-  color: white !important;
-  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3) !important;
-}
-
-.v-btn--flat:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 8px 20px rgba(21, 101, 192, 0.4) !important;
-}
-
-.v-btn--outlined {
-  border: 2px solid #1565c0 !important;
-  color: #1565c0 !important;
-}
-
-.v-btn--outlined:hover {
-  background: rgba(21, 101, 192, 0.08) !important;
-  border-color: #1976d2 !important;
-  transform: translateY(-2px);
-}
-
-/* Text Fields and Selects */
-.v-input__control .v-field {
-  border-radius: 8px !important;
-  background: rgba(255, 255, 255, 0.6) !important;
-  border: 2px solid rgba(21, 101, 192, 0.2) !important;
-  transition: all 0.2s ease;
-}
-
-.v-input__control .v-field:hover {
-  border: 2px solid rgba(21, 101, 192, 0.4) !important;
-  background: rgba(21, 101, 192, 0.04) !important;
-}
-
-.v-input__control .v-field.v-field--focused {
-  border: 2px solid #1565c0 !important;
-  background: rgba(21, 101, 192, 0.08) !important;
-  box-shadow: 0 0 12px rgba(21, 101, 192, 0.2);
-}
-
-.v-theme--dark .v-input__control .v-field {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border: 2px solid rgba(33, 150, 243, 0.2) !important;
-}
-
-/* Dialog Cards */
-.v-dialog__content .v-card {
-  border-radius: 16px !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
-}
-
-.v-card-title {
-  background: linear-gradient(135deg, #1565c0, #1976d2) !important;
-  color: white !important;
-  font-size: 1.3rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.5px !important;
-  padding: 20px 24px !important;
-  border-radius: 16px 16px 0 0 !important;
-}
-
-/* List Items */
-.v-list-item {
-  border-radius: 8px !important;
-  margin: 4px 8px;
-  transition: all 0.2s ease;
-}
-
-.v-list-item:hover {
-  background: rgba(21, 101, 192, 0.08);
-  transform: translateX(4px);
-}
-
-.v-list-item.v-list-item--active {
-  background: linear-gradient(135deg, rgba(21, 101, 192, 0.15), rgba(33, 150, 243, 0.08)) !important;
-  border-left: 4px solid #1565c0;
-  color: #1565c0 !important;
-}
-
-/* Status Badge Large */
-.status-badge-large {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 32px;
-  border: 3px solid;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(21, 101, 192, 0.05), rgba(33, 150, 243, 0.03));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.status-badge-large:hover {
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
-}
-
-.v-theme--dark .status-badge-large {
-  background: linear-gradient(135deg, rgba(33, 150, 243, 0.08), rgba(33, 150, 243, 0.04));
-}
-
-.status-label-small {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: rgba(0, 0, 0, 0.54);
-  margin-bottom: 8px;
-}
-
-.v-theme--dark .status-label-small {
-  color: rgba(255, 255, 255, 0.54);
-}
-
-.status-value-large {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* Info Rows */
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  border-radius: 8px;
-  background: rgba(21, 101, 192, 0.04);
-  border-left: 3px solid #1565c0;
-}
-
-.v-theme--dark .info-row {
-  background: rgba(33, 150, 243, 0.08);
-  border-left: 3px solid #42a5f5;
-}
-
-.info-label {
-  font-weight: 600;
-  color: #1565c0;
-  min-width: 180px;
-}
-
-.v-theme--dark .info-label {
-  color: #42a5f5;
-}
-
-.info-value {
-  flex: 1;
-  text-align: right;
-  color: rgba(0, 0, 0, 0.87);
-  padding-left: 12px;
-}
-
-.v-theme--dark .info-value {
-  color: rgba(255, 255, 255, 0.87);
-}
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #1565c0, #1976d2);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #1976d2, #2196F3);
-}
-
-.v-theme--dark ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-/* Smooth transitions */
-.v-card,
-.v-btn,
-.v-chip,
-.v-list-item {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-/* Empty State */
-.empty-state {
-  text-align: center;
-  padding: 48px 24px;
-  color: rgba(0, 0, 0, 0.54);
-}
-
-.v-theme--dark .empty-state {
-  color: rgba(255, 255, 255, 0.54);
-}
-
-.empty-state .v-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.4;
-}
-
-/* Mobile optimization */
-@media (max-width: 600px) {
-  .v-card {
-    border-radius: 10px !important;
-  }
-
-  .status-badge-large {
-    padding: 16px 24px;
-  }
-
-  .status-value-large {
-    font-size: 1.5rem;
-  }
-
-  .info-label {
-    min-width: 120px;
-  }
-}
-
-/* Dashboard Header */
-.border-bottom {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-}
-
-.v-theme--dark .border-bottom {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-/* Notification Button */
-.notification-btn {
-  transition: all 0.3s ease;
-}
-
-.notification-btn:hover {
-  transform: scale(1.15);
-  box-shadow: 0 4px 16px rgba(21, 101, 192, 0.3);
-}
-
-/* New Report Button */
-.new-report-btn {
-  min-width: 140px !important;
-  font-size: 1rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.5px !important;
-  box-shadow: 0 4px 16px rgba(21, 101, 192, 0.3) !important;
-}
-
-.new-report-btn:hover {
-  transform: translateY(-3px) !important;
-  box-shadow: 0 8px 24px rgba(21, 101, 192, 0.4) !important;
-}
-.notification-actions {
-  gap: 24px !important;     /* or 32px if you want even more space */
+  .page-hdr { flex-direction: column; }
+  .view-full { padding: 16px 12px 0; }
 }
 </style>
